@@ -2,6 +2,8 @@ package com.mercado.orcamento.service;
 
 import com.mercado.orcamento.model.Sessao;
 import com.mercado.orcamento.repository.SessaoRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,8 @@ import java.util.UUID;
 
 @Service
 public class SessaoService {
+
+    private static final Logger logger = LoggerFactory.getLogger(SessaoService.class);
 
     @Autowired
     private SessaoRepository repository;
@@ -63,13 +67,41 @@ public class SessaoService {
         }
     }
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     // Executa a cada 1 minuto para limpar sessões antigas
+    @jakarta.annotation.PostConstruct
+    public void limparNoStartup() {
+        logger.info("Iniciando limpeza total de sessões no banco de dados...");
+        try {
+            // Tenta limpar e resetar o ID (funciona no PostgreSQL e H2 modernos)
+            jdbcTemplate.execute("TRUNCATE TABLE sessao RESTART IDENTITY");
+            logger.info("Tabela truncada e ID reiniciado com sucesso.");
+        } catch (Exception e) {
+            // Fallback caso o banco não suporte TRUNCATE ou ocorra erro
+            repository.deleteAll();
+            logger.warn("Limpeza realizada via deleteAll (ID não resetado): {}", e.getMessage());
+        }
+    }
+
     @Scheduled(fixedRate = 60000)
     public void limparSessoesInativas() {
         // Remove sessões inativas há mais de 5 minutos
         LocalDateTime limite = LocalDateTime.now().minusMinutes(5);
         repository.deleteSessoesInativas(limite);
-        System.out.println("Limpeza de sessões executada: removidas sessões anteriores a " + limite);
+        
+        // Verifica se a tabela ficou vazia para tentar resetar o ID
+        if (repository.count() == 0) {
+            try {
+                jdbcTemplate.execute("ALTER SEQUENCE sessao_id_seq RESTART WITH 1");
+                logger.info("Tabela vazia: ID reiniciado para 1.");
+            } catch (Exception e) {
+                // Ignora erro se a sequence tiver outro nome ou banco for diferente
+            }
+        }
+        
+        logger.debug("Limpeza de sessões executada: removidas sessões anteriores a {}", limite);
     }
 
     public long contarSessoesAtivas() {

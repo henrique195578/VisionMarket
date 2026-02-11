@@ -5,6 +5,8 @@ import com.mercado.orcamento.service.SessaoService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -13,6 +15,8 @@ import java.util.Arrays;
 
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthInterceptor.class);
 
     @Autowired
     private SessaoService sessaoService;
@@ -45,13 +49,14 @@ public class AuthInterceptor implements HandlerInterceptor {
                 // Se o usuário está tentando acessar a HOME, renovamos a sessão automaticamente
                 // para evitar bloqueio eterno por cookie antigo
                 if (path.equals("/")) {
-                    System.out.println("Token inválido na Home. Renovando sessão...");
+                    logger.info("Token inválido na Home. Renovando sessão para IP: {}", request.getRemoteAddr());
                     Sessao novaSessao = sessaoService.criarSessao(request);
                     adicionarCookieSessao(response, novaSessao.getToken());
                     return true;
                 }
 
                 // Para outras rotas, bloqueia
+                logger.warn("Acesso negado para token inválido. IP: {}, Path: {}", request.getRemoteAddr(), path);
                 response.sendRedirect("/acesso-negado");
                 return false;
             }

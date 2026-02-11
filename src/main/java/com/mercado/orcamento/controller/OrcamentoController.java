@@ -10,6 +10,8 @@ import com.mercado.orcamento.dto.DadosExtraidos;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.MediaType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -27,6 +29,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Controller
 public class OrcamentoController {
+
+    private static final Logger logger = LoggerFactory.getLogger(OrcamentoController.class);
 
     private final OrcamentoService service;
     private final ImagemController imagemController;
@@ -67,17 +71,16 @@ public class OrcamentoController {
                     itensJson = objectMapper.writeValueAsString(itens);
                 }
             } catch (Exception e) {
-                System.err.println("Erro ao serializar itens para JSON: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("Erro ao serializar itens para JSON: ", e);
             }
             model.addAttribute("itensJson", itensJson);
             
             long fim = System.currentTimeMillis();
-            System.out.println("Tempo processamento Controller Index: " + (fim - inicio) + "ms");
+            logger.info("Tempo processamento Controller Index: {}ms", (fim - inicio));
             
             return "index";
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Erro fatal ao carregar index: ", e);
             throw new RuntimeException(e);
         }
     }
@@ -86,7 +89,7 @@ public class OrcamentoController {
     @ResponseBody
     public ResponseEntity<Void> logout(@CookieValue(value = "auth_token", required = false) String token) {
         if (token != null) {
-            System.out.println("Logout solicitado para token: " + token);
+            logger.info("Logout solicitado para token: {}", token);
             sessaoService.encerrarSessao(token);
         }
         return ResponseEntity.ok().build();

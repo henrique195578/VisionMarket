@@ -2,6 +2,8 @@ package com.mercado.orcamento.controller;
 
 import com.mercado.orcamento.dto.DadosExtraidos;
 import com.mercado.orcamento.service.OcrService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.CacheControl;
@@ -30,6 +32,8 @@ import java.util.stream.Stream;
 
 @Controller
 public class ImagemController {
+
+    private static final Logger logger = LoggerFactory.getLogger(ImagemController.class);
 
     private final String CAMINHO_FOTOS = "C:\\Users\\Borges\\Downloads\\MERCADO_FOTOS";
     private final OcrService ocrService;
@@ -61,7 +65,7 @@ public class ImagemController {
             ultimaAtualizacaoCache = agora;
             return cacheImagens;
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Erro ao listar imagens do diretório {}: ", CAMINHO_FOTOS, e);
             return Collections.emptyList();
         }
     }
