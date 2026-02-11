@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>VisionMarket</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Ícones do Bootstrap -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        /* Estilos padrão (Light Mode) */
+        .melhor-preco {
+            background-color: #d4edda;
+            color: #155724;
+            font-weight: bold;
+        }
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        
+        /* Ajustes para Dark Mode */
+        [data-bs-theme="dark"] .melhor-preco {
+            background-color: #05511e; /* Verde escuro */
+            color: #d1e7dd; /* Texto claro */
+        }
+        [data-bs-theme="dark"] .loading-overlay {
+            background: rgba(33, 37, 41, 0.9); /* Fundo escuro */
+            color: white;
+        }
+        [data-bs-theme="dark"] .card {
+            border-color: #495057;
+        }
+        
+        .galeria-fotos {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .foto-item img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner-border text-primary" role="status"></div>
+    <span class="mt-2 fw-bold">Analisando imagem com IA...</span>
+</div>
+
+<div class="container mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <!-- Logo visível em todos os dispositivos, ajustada para não quebrar -->
+            <img src="/images/VisonMarket.png" alt="VisionMarket Logo" style="height: 40px; margin-right: 10px; object-fit: contain;">
+            <h3 class="m-0 fw-bold d-none d-sm-block" style="background: linear-gradient(90deg, #0d6efd, #0dcaf0); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">VisionMarket</h3>
+            <!-- Versão mobile do título (menor) se necessário, ou mantemos apenas a logo no mobile muito pequeno se o texto quebrar, mas vamos deixar o texto visivel por enquanto -->
+            <h3 class="m-0 fw-bold d-block d-sm-none" style="font-size: 1.2rem; background: linear-gradient(90deg, #0d6efd, #0dcaf0); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">VisionMarket</h3>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#modalCadastro">
+                <i class="bi bi-gear-fill"></i> Config
+            </button>
+            <button class="btn btn-outline-secondary" id="btnThemeToggle" onclick="toggleTheme()">
+                <i class="bi bi-moon-stars-fill" id="iconTheme"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- MENU DE NAVEGAÇÃO (TABS) -->
+    <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-tab-pane" type="button" role="tab" aria-controls="home-tab-pane" aria-selected="true">
+                📸 Escanear e Cadastrar
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="comprar-tab" data-bs-toggle="tab" data-bs-target="#comprar-tab-pane" type="button" role="tab" aria-controls="comprar-tab-pane" aria-selected="false">
+                🛒 Quero Comprar
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="valores-tab" data-bs-toggle="tab" data-bs-target="#valores-tab-pane" type="button" role="tab" aria-controls="valores-tab-pane" aria-selected="false">
+                💲 Valores (Grade)
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+        
+        <!-- Datalist para Autocomplete de Produtos -->
+        <datalist id="listaProdutosExistentes">
+            <option th:each="item : ${itens}" th:value="${item.nome}"></option>
+        </datalist>
+
+        <!-- ABA 1: ESCANEAR E CADASTRAR (Conteúdo Original) -->
+        <div class="tab-pane fade show active" id="home-tab-pane" role="tabpanel" aria-labelledby="home-tab">
+
+            <!-- Upload / Camera Section -->
+            <div class="card shadow-sm mb-4 border-primary">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">📸 Escanear Preço</h5>
+                    <form method="POST" action="/upload" enctype="multipart/form-data" class="row g-2 align-items-center">
+                        <div class="col-12 col-md-8">
+                            <input type="file" name="file" class="form-control" id="cameraInput" 
+                                   accept="image/*" capture="environment" required>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <button class="btn btn-success fw-bold w-100" type="submit">🚀 Enviar e Ler</button>
+                        </div>
+                    </form>
+                    <div th:if="${mensagem}" class="alert alert-info mt-2 p-2 small mb-0" th:text="${mensagem}"></div>
+                    <div th:if="${erro}" class="alert alert-danger mt-2 p-2 small mb-0" th:text="${erro}"></div>
+                </div>
+            </div>
+
+            <!-- Galeria de Fotos -->
+            <div class="card shadow-sm mb-4" th:if="${!fotos.empty}">
+                <div class="card-header bg-info text-white" data-bs-toggle="collapse" data-bs-target="#collapseFotos">
+                    <span class="fw-bold">📸 Fotos Recentes</span> <small class="d-block d-md-inline">(Toque em 'Escanear' para usar)</small>
+                </div>
+                <div id="collapseFotos" class="collapse show">
+                    <div class="card-body galeria-fotos">
+                        <div class="row">
+                            <div class="col-6 col-md-3 mb-3 text-center foto-item" th:each="foto : ${fotos}">
+                                <div class="border p-2 bg-white h-100 d-flex flex-column justify-content-between">
+                                    <a th:href="@{/imagens/{nome}(nome=${foto})}" target="_blank">
+                                        <img th:src="@{/imagens/{nome}(nome=${foto})}" alt="Foto do Produto" loading="lazy">
+                                    </a>
+                                    <div class="mt-2">
+                                        <small class="d-block mb-1 text-truncate" th:text="${foto}"></small>
+                                        <button class="btn btn-sm btn-outline-primary w-100" 
+                                                th:data-filename="${foto}"
+                                                onclick="escanearImagem(this.getAttribute('data-filename'))">
+                                            👁️ Escanear
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <button class="btn btn-primary w-100 mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#areaCadastro">
+                        ➕ Cadastrar Itens e Preços
+                    </button>
+                    
+                    <div class="collapse show" id="areaCadastro">
+                        <div class="card card-body">
+                            <div class="row">
+                                <!-- Cadastro Rápido -->
+                                <div class="col-md-12">
+                                    <h6 class="text-primary">📝 1. Produto</h6>
+                                    <form action="/adicionar" method="post" class="row g-2 mb-3 align-items-end">
+                                        <div class="col-12 col-md-6">
+                                            <input type="text" id="campoNome" name="nome" class="form-control" 
+                                                   placeholder="Ex: Arroz 5kg" required
+                                                   list="listaProdutosExistentes" autocomplete="off"
+                                                   oninput="this.value = this.value.toUpperCase()">
+                                            <input type="text" id="campoCodigo" name="codigoBarras" class="form-control mt-1 small text-muted" placeholder="Código de Barras" readonly style="font-size: 0.8rem;">
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <input type="text" id="campoMarca" name="marca" class="form-control" placeholder="Marca (Ex: Tio João)">
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <input type="text" id="campoPeso" name="peso" class="form-control" placeholder="Peso (Ex: 5kg)">
+                                        </div>
+                                        <div class="col-12 mt-2">
+                                            <button type="submit" class="btn btn-secondary w-100">💾 Salvar Produto</button>
+                                        </div>
+                                    </form>
+                                    
+                                    <hr>
+
+                                    <h6 class="text-success">R$ 2. Lançar Preço</h6>
+                                    <form action="/preco" method="post" class="row g-2 align-items-end">
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Produto</label>
+                                            <select name="idItem" class="form-select" required>
+                                                <option th:each="item : ${itens}" th:value="${item.id}" th:text="${item.nome}"></option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Mercado</label>
+                                            <select name="mercado" class="form-select" required>
+                                                <option th:each="mercado : ${mercados}" th:value="${mercado}" th:text="${mercado.nomeExibicao}"></option>
+                                            </select>
+                                        </div>
+                                        
+                                        <!-- Varejo -->
+                                        <div class="col-md-2" id="grupoVarejo">
+                                            <label class="form-label small">Varejo</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="number" id="campoValor" name="precoVarejo" step="0.01" class="form-control" placeholder="0.00">
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Atacado -->
+                                        <div class="col-md-2" id="grupoAtacado">
+                                            <label class="form-label small">Atacado</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="number" name="precoAtacado" step="0.01" class="form-control" placeholder="0.00">
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Cartão -->
+                                        <div class="col-md-2" id="grupoCartao">
+                                            <label class="form-label small">Cartão</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="number" name="precoCartao" step="0.01" class="form-control" placeholder="0.00">
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-12 mt-2">
+                                            <button type="submit" class="btn btn-success w-100">💾 Salvar Preços</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 2: QUERO COMPRAR (Lista e Comparação) -->
+        <div class="tab-pane fade" id="comprar-tab-pane" role="tabpanel" aria-labelledby="comprar-tab">
+            
+            <!-- Seleção de Mercado para Comparação -->
+            <div class="card bg-light mb-3">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="m-0 text-primary fw-bold"><i class="bi bi-cart4"></i> Vou ao Mercado:</h5>
+                        <small class="text-muted">Selecione para ver se vale a pena</small>
+                    </div>
+                    <div style="min-width: 200px;">
+                        <select id="selectMercadoComprar" class="form-select form-select-lg fw-bold text-primary" onchange="atualizarTabelaQueroComprar()">
+                            <option value="">Selecione...</option>
+                            <option th:each="mercado : ${mercados}" th:value="${mercado}" th:text="${mercado.nomeExibicao}"></option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista de Itens (Checklist) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <span>📝 Minha Lista Atual</span>
+                    <div>
+                         <form action="/limparLista" method="post" class="d-inline" onsubmit="return confirm('Deseja limpar toda a lista atual? Os itens continuarão salvos no histórico.')">
+                            <button type="submit" class="btn btn-sm btn-light text-danger fw-bold">Limpar Tudo</button>
+                         </form>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Campo de Adição Rápida (Principal) -->
+                    <form action="/importarLista" method="post" class="mb-4">
+                        <label class="form-label fw-bold text-primary">O que falta na despensa?</label>
+                        <div class="input-group input-group-lg">
+                            <input type="text" name="listaRapida" class="form-control" 
+                                   placeholder="Digite o nome do produto (Ex: Arroz, Café...)" required
+                                   list="listaProdutosExistentes"
+                                   oninput="this.value = this.value.toUpperCase()"
+                                   autofocus>
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-plus-lg"></i> Adicionar
+                            </button>
+                        </div>
+                        <div class="form-text">Digite e pressione Enter. Se já comprou antes, o sistema busca do histórico automaticamente.</div>
+                    </form>
+
+                    <!-- Lista Apenas dos Itens Marcados (Atuais) -->
+                    <h6 class="text-muted border-bottom pb-2 mb-2">Na lista para comprar:</h6>
+                    <div class="list-group list-group-flush mb-3" id="listaAtiva">
+                        <div class="list-group-item d-flex justify-content-between align-items-center bg-light" 
+                             th:each="item : ${itens}" 
+                             th:if="${item.naListaDeCompras}">
+                            
+                            <div class="d-flex align-items-center flex-grow-1">
+                                <i class="bi bi-check-circle-fill text-success me-3" style="font-size: 1.5rem;"></i>
+                                <div>
+                                    <span class="fw-bold fs-5" th:text="${item.nome}"></span>
+                                    <div class="text-muted small">
+                                        <span th:text="${item.marca}"></span> 
+                                        <span th:text="${item.peso}"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Botão Remover da Lista (Não exclui do banco) -->
+                            <button class="btn btn-outline-danger btn-sm" 
+                                    th:onclick="'removerDaLista(' + ${item.id} + ')'"
+                                    title="Tirar da lista (Mandar para histórico)">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                        <div th:if="${itens.stream().noneMatch(i -> i.naListaDeCompras)}" class="text-center text-muted py-4">
+                            Sua lista está vazia. Adicione itens acima! 👆
+                        </div>
+                    </div>
+
+                    <!-- Histórico (Colapsado) -->
+                    <div class="accordion" id="accordionHistorico">
+                        <div class="accordion-item border-0">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-light text-muted small py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseHistorico">
+                                    📜 Ver histórico de itens passados (Clique para reativar)
+                                </button>
+                            </h2>
+                            <div id="collapseHistorico" class="accordion-collapse collapse">
+                                <div class="accordion-body p-0">
+                                    <div class="list-group list-group-flush">
+                                        <div class="list-group-item d-flex justify-content-between align-items-center" th:each="item : ${itens}" th:unless="${item.naListaDeCompras}">
+                                            <span class="text-muted small flex-grow-1" style="cursor: pointer;" th:onclick="'reativarItem(' + ${item.id} + ')'">
+                                                <i class="bi bi-plus-circle me-2"></i>
+                                                <span th:text="${item.nome}"></span> 
+                                                <span th:text="${item.marca != null ? '(' + item.marca + ')' : ''}"></span>
+                                            </span>
+                                            <form action="/excluirItem" method="post" class="m-0 p-0">
+                                                <input type="hidden" name="idItem" th:value="${item.id}">
+                                                <button type="submit" class="btn btn-sm btn-link text-danger p-0 ms-2" title="Excluir permanentemente">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela de Decisão (Filtrada) -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">🛒 Decisão de Compra (Itens Selecionados)</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Preço LÁ</th>
+                                    <th class="text-center">Menor Preço</th>
+                                    <th class="text-center">Avaliação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaQueroComprarBody">
+                                <tr><td colspan="4" class="text-center text-muted p-4">Selecione o mercado e marque os itens acima.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 3: VALORES (GRADE GERAL) -->
+        <div class="tab-pane fade" id="valores-tab-pane" role="tabpanel" aria-labelledby="valores-tab">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    📊 Grade de Valores (Geral)
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered mb-0 table-sm" style="font-size: 0.9rem;">
+                            <thead class="table-secondary text-center align-middle">
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Marca</th>
+                                    <th>Peso</th>
+                                    <th>Mercado</th>
+                                    <th>Varejo</th>
+                                    <th>Atacado</th>
+                                    <th>Cartão</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <th:block th:each="item : ${itens}">
+                                    <th:block th:each="mercadoEntry : ${item.precos}">
+                                        <tr>
+                                            <td th:text="${item.nome}"></td>
+                                            <td th:text="${item.marca ?: '-'}"></td>
+                                            <td th:text="${item.peso ?: '-'}"></td>
+                                            <td th:text="${mercadoEntry.key.nomeExibicao}"></td>
+                                            
+                                            <!-- Varejo -->
+                                            <td class="text-end" 
+                                                th:text="${mercadoEntry.value.get(T(com.mercado.orcamento.model.TipoPreco).VAREJO) != null ? 'R$ ' + mercadoEntry.value.get(T(com.mercado.orcamento.model.TipoPreco).VAREJO) : '-'}">
+                                            </td>
+                                            
+                                            <!-- Atacado -->
+                                            <td class="text-end" 
+                                                th:text="${mercadoEntry.value.get(T(com.mercado.orcamento.model.TipoPreco).ATACADO) != null ? 'R$ ' + mercadoEntry.value.get(T(com.mercado.orcamento.model.TipoPreco).ATACADO) : '-'}">
+                                            </td>
+                                            
+                                            <!-- Cartão -->
+                                            <td class="text-end" 
+                                                th:text="${mercadoEntry.value.get(T(com.mercado.orcamento.model.TipoPreco).CARTAO) != null ? 'R$ ' + mercadoEntry.value.get(T(com.mercado.orcamento.model.TipoPreco).CARTAO) : '-'}">
+                                            </td>
+                                        </tr>
+                                    </th:block>
+                                </th:block>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- Fim TabContent -->
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Modal Cadastro / Preferências -->
+<div class="modal fade" id="modalCadastro" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">⚙️ Cadastro e Preferências</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Selecione os cartões que você possui e as modalidades de compra que utiliza.</p>
+                
+                <!-- Tabela 1: Cartões -->
+                <h6 class="fw-bold mt-3 text-primary">💳 Meus Cartões</h6>
+                <div class="list-group mb-3">
+                    <label class="list-group-item" th:each="mercado : ${mercados}">
+                        <input class="form-check-input me-1 pref-cartao" type="checkbox" 
+                               th:value="${mercado}" 
+                               checked>
+                        <span th:text="'Cartão ' + ${mercado.nomeExibicao}"></span>
+                    </label>
+                </div>
+
+                <!-- Tabela 2 e 3: Modalidades -->
+                <h6 class="fw-bold mt-3 text-success">🏷️ Modalidades de Preço</h6>
+                <div class="list-group">
+                    <label class="list-group-item">
+                        <input class="form-check-input me-1 pref-tipo" type="checkbox" value="VAREJO" checked>
+                        Varejo (Unidade)
+                    </label>
+                    <label class="list-group-item">
+                        <input class="form-check-input me-1 pref-tipo" type="checkbox" value="ATACADO" checked>
+                        Atacado (Quantidade)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary w-100" onclick="salvarPreferencias()" data-bs-dismiss="modal">💾 Salvar Preferências</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Lógica de Comparação Inteligente ---
+    // Recebe o JSON do servidor (th:utext garante que não escape as aspas)
+    const DADOS_ITENS = [(${itensJson})]; // Thymeleaf inline
+
+    // --- Funções Auxiliares (Globais) ---
+
+    function calcularMelhorPreco(item, mercado, prefs) {
+        if (!item.precos || !item.precos[mercado]) return null;
+        
+        const precosMercado = item.precos[mercado];
+        let melhor = { valor: Infinity, tipo: '' };
+
+        // Verifica VAREJO
+        if (prefs.tipos.includes('VAREJO') && precosMercado['VAREJO']) {
+            if (precosMercado['VAREJO'] < melhor.valor) {
+                melhor = { valor: precosMercado['VAREJO'], tipo: 'Varejo' };
+            }
+        }
+        
+        // Verifica ATACADO
+        if (prefs.tipos.includes('ATACADO') && precosMercado['ATACADO']) {
+            if (precosMercado['ATACADO'] < melhor.valor) {
+                melhor = { valor: precosMercado['ATACADO'], tipo: 'Atacado' };
+            }
+        }
+        
+        // Verifica CARTAO (Só se user tiver o cartão deste mercado)
+        if (prefs.cartoes.includes(mercado) && precosMercado['CARTAO']) {
+            if (precosMercado['CARTAO'] < melhor.valor) {
+                melhor = { valor: precosMercado['CARTAO'], tipo: 'Cartão' };
+            }
+        }
+
+        return melhor.valor === Infinity ? null : melhor;
+    }
+
+    function formatarNomeMercado(key) {
+        const select = document.querySelector('select[name="mercado"]'); 
+        if (select) {
+             const option = select.querySelector(`option[value="${key}"]`);
+             return option ? option.text : key;
+        }
+        return key;
+    }
+
+    function removerDaLista(idItem) {
+        fetch(`/atualizarListaCompras?idItem=${idItem}&naLista=false`, { method: 'POST' })
+            .then(res => {
+                if(res.ok) window.location.reload(); 
+            });
+    }
+
+    function reativarItem(idItem) {
+        fetch(`/atualizarListaCompras?idItem=${idItem}&naLista=true`, { method: 'POST' })
+            .then(res => {
+                if(res.ok) window.location.reload();
+            });
+    }
+
+    function atualizarTabelaQueroComprar() {
+        const selectMercado = document.getElementById('selectMercadoComprar');
+        const mercadoAtual = selectMercado.value;
+        const tbody = document.getElementById('tabelaQueroComprarBody');
+        
+        const itensFiltrados = DADOS_ITENS.filter(item => item.naListaDeCompras);
+
+        if (itensFiltrados.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted p-4">Sua lista está vazia. Adicione itens acima.</td></tr>';
+            return;
+        }
+
+        if (!mercadoAtual) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted p-4">Selecione o mercado onde você vai comprar.</td></tr>';
+            return;
+        }
+
+        const prefs = JSON.parse(localStorage.getItem('userPrefs')) || { cartoes: [], tipos: ['VAREJO', 'ATACADO'] };
+        let html = '';
+
+        itensFiltrados.forEach(item => {
+            const precoAqui = calcularMelhorPreco(item, mercadoAtual, prefs);
+            
+            let todosPrecos = [];
+            if (item.precos) {
+                Object.keys(item.precos).forEach(mercadoKey => {
+                    const p = calcularMelhorPreco(item, mercadoKey, prefs);
+                    if (p && p.valor !== Infinity) {
+                        todosPrecos.push(p.valor);
+                    }
+                });
+            }
+
+            const minRegional = todosPrecos.length > 0 ? Math.min(...todosPrecos) : 0;
+            const avgRegional = todosPrecos.length > 0 ? todosPrecos.reduce((a, b) => a + b, 0) / todosPrecos.length : 0;
+
+            const valorAquiFormatado = precoAqui ? `R$ ${precoAqui.valor.toFixed(2)} <br><small class="text-muted">${precoAqui.tipo}</small>` : '<span class="text-muted text-center d-block">-</span>';
+            
+            let statsFormatado = '<span class="text-muted small">-</span>';
+            if (todosPrecos.length > 0) {
+                 statsFormatado = `R$ ${minRegional.toFixed(2)}`;
+            }
+
+            let decisao = '';
+            let classeLinha = '';
+
+            if (precoAqui) {
+                if (precoAqui.valor <= minRegional) {
+                    decisao = '<span class="badge bg-success" style="font-size: 0.9rem;">😊 Está barato</span>';
+                    classeLinha = 'table-success';
+                } else if (precoAqui.valor <= avgRegional) {
+                    decisao = '<span class="badge bg-warning text-dark" style="font-size: 0.9rem;">😐 Está na média</span>';
+                    classeLinha = 'table-warning';
+                } else {
+                    decisao = '<span class="badge bg-danger" style="font-size: 0.9rem;">☹️ Está mais caro</span>';
+                }
+            } else {
+                decisao = '<span class="badge bg-secondary">Indisponível</span>';
+            }
+
+            html += `
+                <tr class="${classeLinha}">
+                    <td class="fw-bold">${item.nome} <br> <small class="text-muted fw-normal">${item.marca || ''} ${item.peso || ''}</small></td>
+                    <td>${valorAquiFormatado}</td>
+                    <td class="text-center fw-bold text-secondary" title="Menor preço encontrado na região">${statsFormatado}</td>
+                    <td class="text-center">${decisao}</td>
+                </tr>
+            `;
+        });
+        
+        tbody.innerHTML = html;
+    }
+
+    function escanearImagem(nomeArquivo) {
+        const overlay = document.getElementById('loadingOverlay');
+        const campoNome = document.getElementById('campoNome');
+        const campoValor = document.getElementById('campoValor');
+        const campoCodigo = document.getElementById('campoCodigo');
+
+        overlay.style.display = 'flex';
+
+        fetch('/ocr/' + nomeArquivo)
+            .then(response => response.json())
+            .then(data => {
+                console.log("Dados extraídos:", data);
+                
+                if (data.precoEncontrado) {
+                    campoValor.value = data.precoEncontrado;
+                    campoValor.style.backgroundColor = '#d4edda';
+                    setTimeout(() => campoValor.style.backgroundColor = '', 1000);
+                }
+
+                if (data.codigoBarras) {
+                    campoCodigo.value = data.codigoBarras;
+                    campoCodigo.style.backgroundColor = '#fff3cd';
+                    setTimeout(() => campoCodigo.style.backgroundColor = '', 1000);
+                }
+
+                let nomeSugestivo = "";
+                if (data.nomePossivel) nomeSugestivo += data.nomePossivel;
+                if (data.pesoEncontrado) nomeSugestivo += " " + data.pesoEncontrado;
+
+                if (nomeSugestivo) {
+                    campoNome.value = nomeSugestivo.trim();
+                    campoNome.style.backgroundColor = '#d4edda';
+                    setTimeout(() => campoNome.style.backgroundColor = '', 1000);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Erro ao processar imagem.');
+            })
+            .finally(() => {
+                overlay.style.display = 'none';
+            });
+    }
+
+    // --- Dark Mode ---
+    function toggleTheme() {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-bs-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        html.setAttribute('data-bs-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        atualizarIcone(newTheme);
+    }
+
+    function atualizarIcone(theme) {
+        const icon = document.getElementById('iconTheme');
+        if (theme === 'dark') {
+            icon.className = 'bi bi-sun-fill'; 
+        } else {
+            icon.className = 'bi bi-moon-stars-fill'; 
+        }
+    }
+
+    // --- Preferências ---
+    function carregarPreferencias() {
+        const prefsStr = localStorage.getItem('userPrefs');
+        const prefs = prefsStr ? JSON.parse(prefsStr) : null;
+        
+        if (prefs) {
+            document.querySelectorAll('.pref-cartao').forEach(cb => {
+                cb.checked = prefs.cartoes.includes(cb.value);
+            });
+            document.querySelectorAll('.pref-tipo').forEach(cb => {
+                cb.checked = prefs.tipos.includes(cb.value);
+            });
+            aplicarVisibilidadeCampos(prefs);
+        } else {
+            salvarPreferencias();
+        }
+    }
+
+    function salvarPreferencias() {
+        const cartoes = Array.from(document.querySelectorAll('.pref-cartao:checked')).map(cb => cb.value);
+        const tipos = Array.from(document.querySelectorAll('.pref-tipo:checked')).map(cb => cb.value);
+        
+        const prefs = { cartoes, tipos };
+        localStorage.setItem('userPrefs', JSON.stringify(prefs));
+        
+        aplicarVisibilidadeCampos(prefs);
+    }
+
+    function aplicarVisibilidadeCampos(prefs) {
+        const showAtacado = prefs.tipos.includes('ATACADO');
+        const showVarejo = prefs.tipos.includes('VAREJO');
+        
+        const elAtacado = document.getElementById('grupoAtacado');
+        const elVarejo = document.getElementById('grupoVarejo');
+        
+        if(elAtacado) elAtacado.style.display = showAtacado ? 'block' : 'none';
+        if(elVarejo) elVarejo.style.display = showVarejo ? 'block' : 'none';
+        
+        atualizarCampoCartao();
+    }
+    
+    function atualizarCampoCartao() {
+        const mercadoSelect = document.querySelector('select[name="mercado"]');
+        if (!mercadoSelect) return;
+        
+        const mercadoSelecionado = mercadoSelect.value;
+        const prefs = JSON.parse(localStorage.getItem('userPrefs'));
+        
+        const elCartao = document.getElementById('grupoCartao');
+        
+        if (prefs && prefs.cartoes) {
+            const temCartao = prefs.cartoes.includes(mercadoSelecionado);
+            if(elCartao) elCartao.style.display = temCartao ? 'block' : 'none';
+        }
+    }
+
+    // --- Inicialização Unificada ---
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. Dark Mode
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', savedTheme);
+        atualizarIcone(savedTheme);
+
+        // 2. Status / Alertas via URL
+        const params = new URLSearchParams(window.location.search);
+        const status = params.get('status');
+        
+        if (status === 'existente') {
+            alert("⚠️ ATENÇÃO: Este produto já estava cadastrado!\n\nAs informações foram atualizadas com os novos dados.");
+            window.history.replaceState({}, document.title, "/?tab=home");
+        }
+
+        // 3. Inicialização de Tabs via URL
+        const tab = params.get('tab');
+        if (tab === 'comprar') {
+            const triggerEl = document.querySelector('#comprar-tab');
+            if(triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+        } else if (tab === 'valores') {
+            const triggerEl = document.querySelector('#valores-tab');
+            if(triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+        } else {
+            const triggerEl = document.querySelector('#home-tab');
+            if(triggerEl && !tab) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+        }
+
+        // 4. Preferências e Listeners
+        carregarPreferencias();
+        
+        const selectMercadoCadastro = document.querySelector('select[name="mercado"]');
+        if(selectMercadoCadastro) {
+            selectMercadoCadastro.addEventListener('change', atualizarCampoCartao);
+        }
+
+        // 5. Tabela de Comparação
+        atualizarTabelaQueroComprar();
+
+        // 6. Auto-Scan (se houver arquivo carregado)
+        const arquivoRecemCarregado = "[[${arquivoRecemCarregado}]]";
+        if (arquivoRecemCarregado && arquivoRecemCarregado !== "" && !arquivoRecemCarregado.includes("arquivoRecemCarregado")) {
+            console.log("Auto-escaneando:", arquivoRecemCarregado);
+            escanearImagem(arquivoRecemCarregado);
+        }
+    });
+</script>
+</body>
+</html>
