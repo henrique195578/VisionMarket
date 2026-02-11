@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso Negado</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8d7da;
+            color: #721c24;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 1px solid #f5c6cb;
+        }
+        h1 { margin-bottom: 1rem; }
+        p { margin-bottom: 2rem; }
+        .btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Acesso Negado</h1>
+        <p>Sua sessão é inválida ou expirou. O sistema não pode ser acessado sem um token válido.</p>
+        <p>O navegador será encerrado por segurança.</p>
+        <button class="btn" onclick="fecharNavegador()">Fechar Agora</button>
+    </div>
+
+    <script>
+        function fecharNavegador() {
+            // Tenta fechar a janela. Em navegadores modernos, isso só funciona se a janela foi aberta por script.
+            // Caso contrário, redirecionamos para uma página em branco ou loop.
+            window.open('','_parent','');
+            window.close();
+            
+            // Fallback: Redirecionar para Google ou mostrar alerta
+            alert("Por favor, feche esta aba manualmente.");
+        }
+
+        // Tenta fechar automaticamente após 3 segundos
+        setTimeout(fecharNavegador, 3000);
+    </script>
+</body>
+</html>

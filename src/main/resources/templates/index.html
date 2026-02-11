@@ -2,9 +2,41 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>VisionMarket</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Ícones do Bootstrap -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Script de Inatividade (Auto-Logout 5 min) -->
+    <script>
+        let idleTime = 0;
+        const IDLE_LIMIT = 5 * 60; // 5 minutos em segundos
+
+        function resetTimer() {
+            idleTime = 0;
+        }
+
+        // Incrementa contador a cada segundo
+        setInterval(function() {
+            idleTime++;
+            if (idleTime >= IDLE_LIMIT) {
+                window.location.href = '/acesso-negado';
+            }
+        }, 1000);
+
+        // Reseta timer em qualquer interação
+        window.onload = resetTimer;
+        window.onmousemove = resetTimer;
+        window.onmousedown = resetTimer;
+        window.ontouchstart = resetTimer;
+        window.onclick = resetTimer;
+        window.onkeypress = resetTimer;
+        window.addEventListener('scroll', resetTimer, true);
+
+        // Detecta fechamento da aba/janela e avisa o servidor para encerrar sessão
+        window.addEventListener('beforeunload', function() {
+            navigator.sendBeacon('/api/logout');
+        });
+    </script>
+    <!-- Bootstrap CSS Local -->
+    <link th:href="@{/css/bootstrap.min.css}" rel="stylesheet">
+    <!-- Ícones do Bootstrap (Local + CDN Fallback) -->
+    <link th:href="@{/css/bootstrap-icons.min.css}" rel="stylesheet">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         /* Estilos padrão (Light Mode) */
@@ -98,7 +130,58 @@
         
         <!-- Datalist para Autocomplete de Produtos -->
         <datalist id="listaProdutosExistentes">
+            <!-- Itens já cadastrados no sistema -->
             <option th:each="item : ${itens}" th:value="${item.nome}"></option>
+            
+            <!-- Sugestões comuns para facilitar (Caso o banco esteja vazio) -->
+            <option value="ARROZ"></option>
+            <option value="FEIJAO"></option>
+            <option value="MACARRAO"></option>
+            <option value="OLEO DE SOJA"></option>
+            <option value="AZEITE"></option>
+            <option value="SAL"></option>
+            <option value="ACUCAR"></option>
+            <option value="CAFE"></option>
+            <option value="LEITE"></option>
+            <option value="MANTEIGA"></option>
+            <option value="MARGARINA"></option>
+            <option value="REQUEIJAO"></option>
+            <option value="QUEIJO"></option>
+            <option value="PRESUNTO"></option>
+            <option value="PAO DE FORMA"></option>
+            <option value="OVOS"></option>
+            <option value="FARINHA DE TRIGO"></option>
+            <option value="FERMENTO"></option>
+            <option value="PAPEL HIGIENICO"></option>
+            <option value="SABONETE"></option>
+            <option value="PASTA DE DENTE"></option>
+            <option value="SHAMPOO"></option>
+            <option value="CONDICIONADOR"></option>
+            <option value="SABAO EM PO"></option>
+            <option value="AMACIANTE"></option>
+            <option value="DETERGENTE"></option>
+            <option value="ESPONJA"></option>
+            <option value="AGUA SANITARIA"></option>
+            <option value="DESINFETANTE"></option>
+            <option value="ALCOOL"></option>
+            <option value="BISCOITO"></option>
+            <option value="BOLACHA"></option>
+            <option value="CHOCOLATE"></option>
+            <option value="REFRIGERANTE"></option>
+            <option value="SUCO"></option>
+            <option value="CERVEJA"></option>
+            <option value="CARNE BOVINA"></option>
+            <option value="FRANGO"></option>
+            <option value="LINGUICA"></option>
+            <option value="TOMATE"></option>
+            <option value="CEBOLA"></option>
+            <option value="BATATA"></option>
+            <option value="CENOURA"></option>
+            <option value="ALHO"></option>
+            <option value="BANANA"></option>
+            <option value="MACA"></option>
+            <option value="UVA"></option>
+            <option value="MAMAO"></option>
         </datalist>
 
         <!-- ABA 1: ESCANEAR E CADASTRAR (Conteúdo Original) -->
@@ -309,7 +392,7 @@
                                 <i class="bi bi-x-lg"></i>
                             </button>
                         </div>
-                        <div th:if="${itens.stream().noneMatch(i -> i.naListaDeCompras)}" class="text-center text-muted py-4">
+                        <div th:if="${listaVazia}" class="text-center text-muted py-4">
                             Sua lista está vazia. Adicione itens acima! 👆
                         </div>
                     </div>
@@ -427,8 +510,6 @@
     </div> <!-- Fim TabContent -->
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <!-- Modal Cadastro / Preferências -->
 <div class="modal fade" id="modalCadastro" tabindex="-1">
     <div class="modal-dialog">
@@ -471,10 +552,109 @@
     </div>
 </div>
 
+<!-- Bootstrap JS (Local) -->
+<script th:src="@{/js/bootstrap.bundle.min.js}"></script>
+
 <script>
-    // --- Lógica de Comparação Inteligente ---
-    // Recebe o JSON do servidor (th:utext garante que não escape as aspas)
-    const DADOS_ITENS = [(${itensJson})]; // Thymeleaf inline
+    // --- Funções Globais Independentes ---
+    window.toggleTheme = function() {
+        try {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-bs-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-bs-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            atualizarIcone(newTheme);
+        } catch (e) { console.error("Erro no toggleTheme:", e); }
+    }
+
+    window.atualizarIcone = function(theme) {
+        const icon = document.getElementById('iconTheme');
+        if (icon) {
+            icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill';
+        }
+    }
+
+    // --- Inicialização da UI ---
+    document.addEventListener("DOMContentLoaded", function() {
+        console.log("Inicializando UI...");
+        
+        // 1. Dark Mode
+        try {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-bs-theme', savedTheme);
+            atualizarIcone(savedTheme);
+        } catch(e) { console.error("Erro DarkMode init:", e); }
+
+        // 2. Persistência de Abas (Lógica Simplificada e Robusta)
+        // Garante que o Bootstrap esteja carregado antes de usar
+        if (typeof bootstrap !== 'undefined') {
+            const activeTabTarget = localStorage.getItem('activeTabTarget');
+            if (activeTabTarget) {
+                const tabTrigger = document.querySelector(`button[data-bs-target="${activeTabTarget}"]`);
+                if (tabTrigger) {
+                    const tabInstance = new bootstrap.Tab(tabTrigger);
+                    tabInstance.show();
+                }
+            }
+
+            // Listener para salvar a aba selecionada
+            document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+                tab.addEventListener('shown.bs.tab', function (event) {
+                    localStorage.setItem('activeTabTarget', event.target.getAttribute('data-bs-target'));
+                });
+            });
+            
+            // Lógica de URL (Status/Tabs via Query Param)
+            const params = new URLSearchParams(window.location.search);
+            
+            // Status Alert
+            const status = params.get('status');
+            if (status === 'existente') {
+                alert("⚠️ Produto já cadastrado! Dados atualizados.");
+                const newUrl = window.location.pathname + "?tab=home";
+                window.history.replaceState({}, '', newUrl);
+            }
+            
+            // Tab via URL (Sobrescreve localStorage se presente)
+            const tabParam = params.get('tab');
+            if(tabParam) {
+                let targetId = '#home-tab'; // Default
+                if(tabParam === 'comprar') targetId = '#comprar-tab';
+                if(tabParam === 'valores') targetId = '#valores-tab';
+                
+                const tabEl = document.querySelector(targetId);
+                if(tabEl) {
+                    const bsTab = new bootstrap.Tab(tabEl);
+                    bsTab.show();
+                }
+            }
+            
+        } else {
+            console.error("ERRO CRÍTICO: Bootstrap não foi carregado. Verifique os arquivos em /static/js/");
+            // Fallback de emergência: força click nativo
+            const activeTabTarget = localStorage.getItem('activeTabTarget');
+            if (activeTabTarget) {
+                 const el = document.querySelector(`button[data-bs-target="${activeTabTarget}"]`);
+                 if(el) el.click();
+            }
+        }
+    });
+</script>
+
+<!-- Script de Lógica de Negócio (Dados) -->
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    
+    // Recebe o JSON do servidor de forma segura
+    let DADOS_ITENS = [];
+    try {
+        DADOS_ITENS = [(${itensJson})]; 
+    } catch (e) {
+        console.error("Erro ao carregar dados dos itens:", e);
+        DADOS_ITENS = [];
+    }
 
     // --- Funções Auxiliares (Globais) ---
 
@@ -648,25 +828,8 @@
             });
     }
 
-    // --- Dark Mode ---
-    function toggleTheme() {
-        const html = document.documentElement;
-        const currentTheme = html.getAttribute('data-bs-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        
-        html.setAttribute('data-bs-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-        atualizarIcone(newTheme);
-    }
-
-    function atualizarIcone(theme) {
-        const icon = document.getElementById('iconTheme');
-        if (theme === 'dark') {
-            icon.className = 'bi bi-sun-fill'; 
-        } else {
-            icon.className = 'bi bi-moon-stars-fill'; 
-        }
-    }
+    // --- Dark Mode (Funções auxiliares para UI já foram definidas no script anterior) ---
+    // Mantemos aqui apenas lógica específica se necessário, mas as globais estão acima.
 
     // --- Preferências ---
     function carregarPreferencias() {
@@ -724,36 +887,11 @@
         }
     }
 
-    // --- Inicialização Unificada ---
+    // --- Inicialização da Lógica de Negócio ---
     document.addEventListener("DOMContentLoaded", function() {
-        // 1. Dark Mode
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        document.documentElement.setAttribute('data-bs-theme', savedTheme);
-        atualizarIcone(savedTheme);
+        console.log("Inicializando Lógica de Negócio...");
 
-        // 2. Status / Alertas via URL
-        const params = new URLSearchParams(window.location.search);
-        const status = params.get('status');
-        
-        if (status === 'existente') {
-            alert("⚠️ ATENÇÃO: Este produto já estava cadastrado!\n\nAs informações foram atualizadas com os novos dados.");
-            window.history.replaceState({}, document.title, "/?tab=home");
-        }
-
-        // 3. Inicialização de Tabs via URL
-        const tab = params.get('tab');
-        if (tab === 'comprar') {
-            const triggerEl = document.querySelector('#comprar-tab');
-            if(triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
-        } else if (tab === 'valores') {
-            const triggerEl = document.querySelector('#valores-tab');
-            if(triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
-        } else {
-            const triggerEl = document.querySelector('#home-tab');
-            if(triggerEl && !tab) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
-        }
-
-        // 4. Preferências e Listeners
+        // 1. Preferências e Listeners
         carregarPreferencias();
         
         const selectMercadoCadastro = document.querySelector('select[name="mercado"]');
@@ -761,16 +899,18 @@
             selectMercadoCadastro.addEventListener('change', atualizarCampoCartao);
         }
 
-        // 5. Tabela de Comparação
+        // 2. Tabela de Comparação
         atualizarTabelaQueroComprar();
 
-        // 6. Auto-Scan (se houver arquivo carregado)
-        const arquivoRecemCarregado = "[[${arquivoRecemCarregado}]]";
+        // 3. Auto-Scan (se houver arquivo carregado)
+        // Uso seguro do Thymeleaf inline dentro do bloco CDATA já declarado
+        const arquivoRecemCarregado = [[${arquivoRecemCarregado}]];
         if (arquivoRecemCarregado && arquivoRecemCarregado !== "" && !arquivoRecemCarregado.includes("arquivoRecemCarregado")) {
             console.log("Auto-escaneando:", arquivoRecemCarregado);
             escanearImagem(arquivoRecemCarregado);
         }
     });
+    /*]]>*/
 </script>
 </body>
 </html>

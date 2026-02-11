@@ -28,6 +28,7 @@ public class Produto {
     private Long grupoEquivalenciaId; 
 
     @com.fasterxml.jackson.annotation.JsonIgnore
+    @lombok.ToString.Exclude
     @OneToMany(mappedBy = "produto", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<RegistroPreco> historicoPrecos = new ArrayList<>();
     
@@ -39,10 +40,13 @@ public class Produto {
     }
 
     // Helper para compatibilidade com a View (Thymeleaf e JS)
+    // Removido JsonIgnore para permitir que o JS acesse os preços
     public java.util.Map<Mercado, java.util.Map<TipoPreco, java.math.BigDecimal>> getPrecos() {
         java.util.Map<Mercado, java.util.Map<TipoPreco, java.math.BigDecimal>> mapa = new java.util.HashMap<>();
         
         for (RegistroPreco rp : historicoPrecos) {
+            if (rp.getMercado() == null || rp.getTipoPreco() == null || rp.getValor() == null) continue;
+            
             // Se tiver múltiplos preços pro mesmo mercado/tipo, pega o mais recente (assumindo que a lista pode ter histórico antigo)
             // Aqui simplificamos pegando o último (ou sobrescrevendo)
             mapa.computeIfAbsent(rp.getMercado(), k -> new java.util.HashMap<>())

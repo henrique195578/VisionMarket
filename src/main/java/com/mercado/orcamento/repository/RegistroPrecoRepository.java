@@ -18,4 +18,7 @@ public interface RegistroPrecoRepository extends JpaRepository<RegistroPreco, Lo
 
     @Query("SELECT AVG(r.valor) FROM RegistroPreco r WHERE r.produto = :produto")
     BigDecimal findMediaPrecoByProduto(@Param("produto") Produto produto);
+
+    @Query("SELECT r FROM RegistroPreco r JOIN FETCH r.produto p ORDER BY p.nome")
+    List<RegistroPreco> findAllCompleto();
 }

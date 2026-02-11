@@ -5,6 +5,7 @@ import com.mercado.orcamento.model.Produto;
 import com.mercado.orcamento.model.TipoPreco;
 import com.mercado.orcamento.service.OcrService;
 import com.mercado.orcamento.service.OrcamentoService;
+import com.mercado.orcamento.service.SessaoService;
 import com.mercado.orcamento.dto.DadosExtraidos;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.CookieValue;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -30,33 +32,64 @@ public class OrcamentoController {
     private final ImagemController imagemController;
     private final OcrService ocrService;
     private final ObjectMapper objectMapper;
+    private final SessaoService sessaoService;
 
-    public OrcamentoController(OrcamentoService service, ImagemController imagemController, OcrService ocrService, ObjectMapper objectMapper) {
+    public OrcamentoController(OrcamentoService service, ImagemController imagemController, OcrService ocrService, ObjectMapper objectMapper, SessaoService sessaoService) {
         this.service = service;
         this.imagemController = imagemController;
         this.ocrService = ocrService;
         this.objectMapper = objectMapper;
+        this.sessaoService = sessaoService;
     }
 
     @GetMapping("/")
     public String index(Model model) {
         try {
-            model.addAttribute("itens", service.listarItens());
+            long inicio = System.currentTimeMillis();
+            
+            List<Produto> itens = service.listarItens();
+            model.addAttribute("itens", itens);
+            
             model.addAttribute("mercados", Mercado.values());
             model.addAttribute("tiposPreco", TipoPreco.values());
             
             model.addAttribute("tabelaPrecos", service.listarPrecosPlanos());
             model.addAttribute("fotos", imagemController.listarImagens());
             
+            // Verifica se a lista de compras está vazia (para uso na View)
+            boolean listaVazia = itens == null || itens.stream().noneMatch(Produto::isNaListaDeCompras);
+            model.addAttribute("listaVazia", listaVazia);
+            
             // Serializa os itens para JSON para uso no JavaScript (Lógica de Melhor Preço)
-            String itensJson = objectMapper.writeValueAsString(service.listarItens());
+            String itensJson = "[]";
+            try {
+                if (itens != null && !itens.isEmpty()) {
+                    itensJson = objectMapper.writeValueAsString(itens);
+                }
+            } catch (Exception e) {
+                System.err.println("Erro ao serializar itens para JSON: " + e.getMessage());
+                e.printStackTrace();
+            }
             model.addAttribute("itensJson", itensJson);
+            
+            long fim = System.currentTimeMillis();
+            System.out.println("Tempo processamento Controller Index: " + (fim - inicio) + "ms");
             
             return "index";
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
+    }
+    
+    @PostMapping("/api/logout")
+    @ResponseBody
+    public ResponseEntity<Void> logout(@CookieValue(value = "auth_token", required = false) String token) {
+        if (token != null) {
+            System.out.println("Logout solicitado para token: " + token);
+            sessaoService.encerrarSessao(token);
+        }
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/adicionar")
@@ -116,6 +149,11 @@ public class OrcamentoController {
         }
         
         return "redirect:/?tab=home";
+    }
+
+    @GetMapping("/acesso-negado")
+    public String acessoNegado() {
+        return "acesso-negado";
     }
 
     // Endpoints de Imagem e OCR delegados ou mantidos aqui por simplicidade (já estão no ImagemController, mas podemos centralizar se quiser)

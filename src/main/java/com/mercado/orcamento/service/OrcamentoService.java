@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import java.util.Map;
+import java.util.stream.Collectors;
+
 @Service
 public class OrcamentoService {
 
@@ -30,7 +33,7 @@ public class OrcamentoService {
     }
 
     public List<Produto> listarItens() {
-        return produtoRepository.findAll(org.springframework.data.domain.Sort.by("nome"));
+        return produtoRepository.findAllWithPrecos();
     }
 
     @Transactional
@@ -69,28 +72,35 @@ public class OrcamentoService {
     }
 
     public List<RegistroPrecoDTO> listarPrecosPlanos() {
-        List<RegistroPrecoDTO> tabelaPlana = new ArrayList<>();
-        List<Produto> produtos = produtoRepository.findAll();
+        // 1. Busca TUDO em UMA query (Performance Otimizada)
+        List<RegistroPreco> todosPrecos = registroPrecoRepository.findAllCompleto();
+        
+        // 2. Calcula o menor preço por produto em memória
+        Map<Long, BigDecimal> menoresPrecos = todosPrecos.stream()
+            .collect(Collectors.groupingBy(
+                rp -> rp.getProduto().getId(),
+                Collectors.mapping(RegistroPreco::getValor, Collectors.minBy(BigDecimal::compareTo))
+            ))
+            .entrySet().stream()
+            .filter(e -> e.getValue().isPresent())
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
 
-        for (Produto produto : produtos) {
-            // Busca histórico do produto
-            List<RegistroPreco> historico = registroPrecoRepository.findByProduto(produto);
-            
-            // Calcula estatísticas básicas
-            BigDecimal menorPreco = registroPrecoRepository.findMenorPrecoByProduto(produto);
-            
-            for (RegistroPreco rp : historico) {
-                boolean ehMelhor = menorPreco != null && rp.getValor().compareTo(menorPreco) == 0;
-                
-                tabelaPlana.add(new RegistroPrecoDTO(
-                    rp.getMercado().getNomeExibicao(),
-                    produto.getNome(),
-                    rp.getValor(),
-                    rp.getTipoPreco().getDescricao(),
-                    ehMelhor
-                ));
-            }
+        List<RegistroPrecoDTO> tabelaPlana = new ArrayList<>();
+        
+        // 3. Monta a lista final
+        for (RegistroPreco rp : todosPrecos) {
+            BigDecimal menor = menoresPrecos.get(rp.getProduto().getId());
+            boolean ehMelhor = menor != null && rp.getValor().compareTo(menor) == 0;
+
+            tabelaPlana.add(new RegistroPrecoDTO(
+                rp.getMercado().getNomeExibicao(),
+                rp.getProduto().getNome(),
+                rp.getValor(),
+                rp.getTipoPreco().getDescricao(),
+                ehMelhor
+            ));
         }
+        
         return tabelaPlana;
     }
 

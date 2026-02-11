@@ -18,6 +18,7 @@ public class RegistroPreco {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "produto_id")
+    @lombok.ToString.Exclude
     private Produto produto;
 
     @Enumerated(EnumType.STRING)
