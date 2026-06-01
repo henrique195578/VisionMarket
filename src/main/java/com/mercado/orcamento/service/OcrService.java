@@ -9,6 +9,7 @@ import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
@@ -27,6 +28,8 @@ public class OcrService {
     private static final Logger logger = LoggerFactory.getLogger(OcrService.class);
 
     private final String CAMINHO_FOTOS = "C:\\Users\\Borges\\Downloads\\MERCADO_FOTOS";
+    private final String tessdataPathConfigurado;
+    private final String idiomaOcr;
     
     // "Cérebro" de conhecimento prévio (Simulando uma base de dados ou IA treinada)
     private static final List<String> DICIONARIO_PRODUTOS = Arrays.asList(
@@ -37,9 +40,16 @@ public class OcrService {
         "CARNE", "FRANGO", "PEIXE", "OVO", "QUEIJO", "PRESUNTO", "IOURTE", "MANTEIGA"
     );
 
+    public OcrService(@Value("${visionmarket.ocr.tessdata-path:}") String tessdataPathConfigurado,
+                      @Value("${visionmarket.ocr.language:eng}") String idiomaOcr) {
+        this.tessdataPathConfigurado = tessdataPathConfigurado;
+        this.idiomaOcr = idiomaOcr;
+    }
+
     public DadosExtraidos extrairDadosDaImagem(String nomeArquivo) {
         File imagem = new File(CAMINHO_FOTOS, nomeArquivo);
         DadosExtraidos dados = new DadosExtraidos();
+        dados.setNomeArquivoImagem(nomeArquivo);
 
         if (!imagem.exists()) {
             dados.setTextoBruto("Erro: Arquivo não encontrado.");
@@ -57,9 +67,16 @@ public class OcrService {
         }
 
         // 2. Tenta ler Texto (OCR) com Pré-processamento (Visão Computacional Básica)
+        String tessdataPath = resolverTessdataPath();
+        if (tessdataPath == null) {
+            dados.setTextoBruto("OCR indisponivel: pasta tessdata nao encontrada.");
+            logger.warn("OCR indisponivel: configure visionmarket.ocr.tessdata-path com uma pasta valida.");
+            return dados;
+        }
+
         ITesseract instance = new Tesseract();
-        instance.setDatapath("d:\\PROJETO_AUTOMACAO_TRAE\\MERCADO_ORCAMENTOS\\tessdata");
-        instance.setLanguage("eng"); 
+        instance.setDatapath(tessdataPath);
+        instance.setLanguage(idiomaOcr);
 
         try {
             // APLICAÇÃO DE IA/VISÃO: Melhora a imagem antes de ler
@@ -74,9 +91,32 @@ public class OcrService {
         } catch (TesseractException | IOException e) {
             dados.setTextoBruto("Erro ao processar imagem: " + e.getMessage());
             logger.error("Erro OCR Tesseract: ", e);
+        } catch (Throwable t) {
+            dados.setTextoBruto("OCR indisponivel no ambiente atual: " + t.getMessage());
+            logger.error("Falha inesperada no mecanismo OCR: ", t);
         }
 
         return dados;
+    }
+
+    private String resolverTessdataPath() {
+        List<String> candidatos = new ArrayList<>();
+
+        if (tessdataPathConfigurado != null && !tessdataPathConfigurado.isBlank()) {
+            candidatos.add(tessdataPathConfigurado);
+        }
+
+        candidatos.add("D:\\PROJETO_AUTOMACAO_TRAE\\MERCADO_ORCAMENTOS\\tessdata");
+        candidatos.add("C:\\Program Files\\Tesseract-OCR\\tessdata");
+        candidatos.add("C:\\Program Files (x86)\\Tesseract-OCR\\tessdata");
+
+        for (String candidato : candidatos) {
+            if (candidato != null && !candidato.isBlank() && new File(candidato).exists()) {
+                return candidato;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -116,69 +156,122 @@ public class OcrService {
     }
 
     private void processarTexto(String texto, DadosExtraidos dados) {
-        // Limpeza básica
-        String limpo = texto.replaceAll("\n", " ").trim();
+        String limpo = texto.replace("\r", "");
+        String textoLinear = limpo.replaceAll("\n", " ").trim();
 
-        // Tenta achar preço (ex: 10,90 ou 10.90 ou R$ 10,90)
-        Pattern padraoPreco = Pattern.compile("(?:R\\$\\s*)?(\\d+[.,]\\d{2})");
-        Matcher matcherPreco = padraoPreco.matcher(limpo);
-        if (matcherPreco.find()) {
-            dados.setPrecoEncontrado(matcherPreco.group(1).replace(",", "."));
+        dados.setPrecoEncontrado(extrairMelhorPreco(limpo, textoLinear));
+        dados.setPesoEncontrado(extrairPeso(textoLinear));
+
+        String descricao = extrairDescricaoProduto(limpo);
+        dados.setDescricaoProduto(descricao);
+        dados.setNomePossivel(descricao);
+    }
+
+    private String extrairMelhorPreco(String textoOriginal, String textoLinear) {
+        List<String> candidatos = new ArrayList<>();
+
+        for (String linha : textoOriginal.split("\n")) {
+            String linhaLimpa = linha.trim().toUpperCase();
+            if (linhaLimpa.isBlank()) {
+                continue;
+            }
+
+            boolean linhaDePreco = linhaLimpa.contains("R$")
+                    || linhaLimpa.matches(".*\\d+[.,]\\d{2}.*")
+                    || linhaLimpa.contains("ATAC")
+                    || linhaLimpa.contains("CART")
+                    || linhaLimpa.contains("CLUBE")
+                    || linhaLimpa.contains("OFERTA");
+
+            if (linhaDePreco) {
+                Matcher matcher = Pattern.compile("(\\d+[.,]\\d{2})").matcher(linhaLimpa);
+                while (matcher.find()) {
+                    candidatos.add(matcher.group(1).replace(",", "."));
+                }
+            }
         }
 
-        // Tenta achar peso (ex: 500g, 1kg, 1.5kg, 2 Litros)
+        if (candidatos.isEmpty()) {
+            Matcher matcherPreco = Pattern.compile("(?:R\\$\\s*)?(\\d+[.,]\\d{2})").matcher(textoLinear);
+            if (matcherPreco.find()) {
+                return matcherPreco.group(1).replace(",", ".");
+            }
+            return null;
+        }
+
+        return candidatos.get(0);
+    }
+
+    private String extrairPeso(String textoLinear) {
         Pattern padraoPeso = Pattern.compile("(\\d+(?:[.,]\\d+)?\\s*(?:kg|g|ml|l|litros?))", Pattern.CASE_INSENSITIVE);
-        Matcher matcherPeso = padraoPeso.matcher(limpo);
+        Matcher matcherPeso = padraoPeso.matcher(textoLinear);
         if (matcherPeso.find()) {
-            dados.setPesoEncontrado(matcherPeso.group(1));
+            return matcherPeso.group(1).toUpperCase();
         }
-        
-        // --- IA SIMBÓLICA / FUZZY MATCHING ---
-        // Tenta identificar o produto comparando com nosso "Dicionário"
-        // Em vez de só pegar a primeira linha, calculamos a distância de Levenshtein
-        // para achar a palavra mais próxima de um produto conhecido.
-        
-        String[] linhas = texto.split("\n");
+        return null;
+    }
+
+    private String extrairDescricaoProduto(String texto) {
+        List<String> linhasValidas = new ArrayList<>();
+        for (String linha : texto.split("\n")) {
+            String linhaNormalizada = normalizarLinhaProduto(linha);
+            if (linhaNormalizada == null) {
+                continue;
+            }
+            linhasValidas.add(linhaNormalizada);
+        }
+
+        if (linhasValidas.isEmpty()) {
+            return null;
+        }
+
         String melhorCandidato = null;
         int menorDistancia = Integer.MAX_VALUE;
 
-        for (String linha : linhas) {
-            linha = linha.trim().toUpperCase();
-            
-            // Ignora lixo
-            if (linha.length() < 3 || linha.matches(".*R\\$\\s*\\d.*") || linha.matches(".*\\d+[.,]\\d{2}.*")) continue;
-
-            // Compara cada palavra da linha com nosso dicionário
+        for (String linha : linhasValidas) {
             String[] palavras = linha.split("\\s+");
             for (String palavra : palavras) {
-                if (palavra.length() < 3) continue;
-                
+                if (palavra.length() < 3) {
+                    continue;
+                }
+
                 for (String produtoConhecido : DICIONARIO_PRODUTOS) {
                     int distancia = calcularDistanciaLevenshtein(palavra, produtoConhecido);
-                    
-                    // Se a palavra for muito parecida (distância pequena), é nosso candidato
-                    // Ex: "ARR0Z" (dist 1) vs "ARROZ"
                     if (distancia < menorDistancia) {
                         menorDistancia = distancia;
-                        melhorCandidato = linha; // Pega a linha toda pois geralmente tem marca (ARROZ TIO JOAO)
+                        melhorCandidato = linha;
                     }
                 }
             }
         }
 
-        // Se achou algo com boa confiança (distância baixa), define. Se não, usa fallback antigo.
         if (melhorCandidato != null && menorDistancia <= 2) {
-            dados.setNomePossivel(melhorCandidato + " (Identificado via IA Fuzzy)");
-        } else {
-            // Fallback: pega primeira linha válida
-            for (String linha : linhas) {
-                linha = linha.trim();
-                if (linha.length() > 3 && !linha.matches(".*R\\$\\s*\\d.*") && !linha.matches("^\\d+[.,]?\\d*$")) {
-                    dados.setNomePossivel(linha);
-                    break;
-                }
-            }
+            return melhorCandidato;
         }
+
+        return linhasValidas.get(0);
+    }
+
+    private String normalizarLinhaProduto(String linha) {
+        String normalizada = linha == null ? "" : linha.trim().toUpperCase();
+        if (normalizada.length() < 3) {
+            return null;
+        }
+
+        if (normalizada.contains("R$") || normalizada.matches(".*\\d+[.,]\\d{2}.*")) {
+            return null;
+        }
+
+        if (normalizada.matches("^\\d+$") || normalizada.matches(".*\\b(COD|EAN|SKU|QTD|UN|UND)\\b.*")) {
+            return null;
+        }
+
+        normalizada = normalizada.replaceAll("[^A-Z0-9\\s]", " ").replaceAll("\\s{2,}", " ").trim();
+        if (normalizada.length() < 3) {
+            return null;
+        }
+
+        return normalizada;
     }
 
     // Algoritmo clássico de IA para medir similaridade entre textos

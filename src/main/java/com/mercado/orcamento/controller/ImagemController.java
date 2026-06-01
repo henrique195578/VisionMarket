@@ -24,6 +24,7 @@ import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -114,21 +115,30 @@ public class ImagemController {
                 Files.createDirectories(diretorio);
             }
 
-            // Salva o arquivo
-            byte[] bytes = file.getBytes();
-            Path path = diretorio.resolve(file.getOriginalFilename());
-            Files.write(path, bytes);
+            // Normaliza o nome para evitar caminhos vindos do navegador e
+            // caracteres invalidos em Windows durante o upload.
+            String nomeOriginal = file.getOriginalFilename();
+            String nomeSeguro = (nomeOriginal == null || nomeOriginal.isBlank())
+                    ? "imagem-upload.jpg"
+                    : Paths.get(nomeOriginal).getFileName().toString().replaceAll("[\\\\/:*?\"<>|]", "_");
+
+            Path path = diretorio.resolve(nomeSeguro);
+            if (Files.exists(path)) {
+                logger.info("Arquivo ja existente na galeria. Reutilizando imagem: {}", nomeSeguro);
+            } else {
+                Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             // Invalida o cache para mostrar a nova imagem imediatamente
             this.cacheImagens = Collections.emptyList();
             this.ultimaAtualizacaoCache = 0;
 
-            redirectAttributes.addFlashAttribute("mensagem", "Upload realizado com sucesso: " + file.getOriginalFilename());
+            redirectAttributes.addFlashAttribute("mensagem", "Imagem pronta para leitura: " + nomeSeguro);
             // Passa o nome do arquivo para que a tela já possa sugerir o scan
-            redirectAttributes.addFlashAttribute("arquivoRecemCarregado", file.getOriginalFilename());
+            redirectAttributes.addFlashAttribute("arquivoRecemCarregado", nomeSeguro);
 
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Erro ao fazer upload da imagem: {}", file.getOriginalFilename(), e);
             redirectAttributes.addFlashAttribute("erro", "Erro ao fazer upload: " + e.getMessage());
         }
 

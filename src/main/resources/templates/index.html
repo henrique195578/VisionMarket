@@ -6,7 +6,6 @@
     <script>
         let idleTime = 0;
         const IDLE_LIMIT = 5 * 60; // 5 minutos em segundos
-
         function resetTimer() {
             idleTime = 0;
         }
@@ -28,10 +27,8 @@
         window.onkeypress = resetTimer;
         window.addEventListener('scroll', resetTimer, true);
 
-        // Detecta fechamento da aba/janela e avisa o servidor para encerrar sessão
-        window.addEventListener('beforeunload', function() {
-            navigator.sendBeacon('/api/logout');
-        });
+        // Nao faz logout automatico em beforeunload, pois submit/redirect tambem
+        // disparam esse evento e podem invalidar a experiencia durante upload.
     </script>
     <!-- Bootstrap CSS Local -->
     <link th:href="@{/css/bootstrap.min.css}" rel="stylesheet">
@@ -528,7 +525,7 @@
                         <input class="form-check-input me-1 pref-cartao" type="checkbox" 
                                th:value="${mercado}" 
                                checked>
-                        <span th:text="'Cartão ' + ${mercado.nomeExibicao}"></span>
+                        <span th:text="|Cartão ${mercado.nomeExibicao}|"></span>
                     </label>
                 </div>
 
@@ -578,8 +575,6 @@
 
     // --- Inicialização da UI ---
     document.addEventListener("DOMContentLoaded", function() {
-        console.log("Inicializando UI...");
-        
         // 1. Dark Mode
         try {
             const savedTheme = localStorage.getItem('theme') || 'light';
@@ -632,7 +627,6 @@
             }
             
         } else {
-            console.error("ERRO CRÍTICO: Bootstrap não foi carregado. Verifique os arquivos em /static/js/");
             // Fallback de emergência: força click nativo
             const activeTabTarget = localStorage.getItem('activeTabTarget');
             if (activeTabTarget) {
@@ -810,8 +804,15 @@
                 }
 
                 let nomeSugestivo = "";
-                if (data.nomePossivel) nomeSugestivo += data.nomePossivel;
-                if (data.pesoEncontrado) nomeSugestivo += " " + data.pesoEncontrado;
+                if (data.descricaoProduto) {
+                    nomeSugestivo += data.descricaoProduto;
+                } else if (data.nomePossivel) {
+                    nomeSugestivo += data.nomePossivel;
+                }
+
+                if (data.pesoEncontrado && nomeSugestivo && !nomeSugestivo.includes(data.pesoEncontrado)) {
+                    nomeSugestivo += " " + data.pesoEncontrado;
+                }
 
                 if (nomeSugestivo) {
                     campoNome.value = nomeSugestivo.trim();
@@ -889,8 +890,6 @@
 
     // --- Inicialização da Lógica de Negócio ---
     document.addEventListener("DOMContentLoaded", function() {
-        console.log("Inicializando Lógica de Negócio...");
-
         // 1. Preferências e Listeners
         carregarPreferencias();
         
@@ -906,7 +905,6 @@
         // Uso seguro do Thymeleaf inline dentro do bloco CDATA já declarado
         const arquivoRecemCarregado = [[${arquivoRecemCarregado}]];
         if (arquivoRecemCarregado && arquivoRecemCarregado !== "" && !arquivoRecemCarregado.includes("arquivoRecemCarregado")) {
-            console.log("Auto-escaneando:", arquivoRecemCarregado);
             escanearImagem(arquivoRecemCarregado);
         }
     });
