@@ -8,6 +8,10 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
+
+import com.mercado.orcamento.model.Mercado;
+import com.mercado.orcamento.model.TipoPreco;
 
 public interface RegistroPrecoRepository extends JpaRepository<RegistroPreco, Long> {
     
@@ -21,4 +25,6 @@ public interface RegistroPrecoRepository extends JpaRepository<RegistroPreco, Lo
 
     @Query("SELECT r FROM RegistroPreco r JOIN FETCH r.produto p ORDER BY p.nome")
     List<RegistroPreco> findAllCompleto();
+
+    Optional<RegistroPreco> findTopByProdutoIdAndMercadoAndTipoPrecoOrderByDataRegistroDesc(Long produtoId, Mercado mercado, TipoPreco tipoPreco);
 }

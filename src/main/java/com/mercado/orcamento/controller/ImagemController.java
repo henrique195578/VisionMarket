@@ -9,6 +9,7 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +26,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +39,8 @@ import java.util.stream.Stream;
 public class ImagemController {
 
     private static final Logger logger = LoggerFactory.getLogger(ImagemController.class);
+    private static final Duration TEMPO_EXPIRACAO_FOTOS = Duration.ofHours(24);
+    private static final long CACHE_IMAGENS_MS = 300000;
 
     private final String CAMINHO_FOTOS = "C:\\Users\\Borges\\Downloads\\MERCADO_FOTOS";
     private final OcrService ocrService;
@@ -49,10 +55,11 @@ public class ImagemController {
 
     // Retorna a lista de nomes de arquivos de imagem
     public List<String> listarImagens() {
+        limparImagensExpiradas();
         long agora = System.currentTimeMillis();
         
         // Atualiza o cache apenas se passou 5 minutos (300.000 ms)
-        if (agora - ultimaAtualizacaoCache < 300000 && !cacheImagens.isEmpty()) {
+        if (agora - ultimaAtualizacaoCache < CACHE_IMAGENS_MS && !cacheImagens.isEmpty()) {
             return cacheImagens;
         }
         
@@ -143,5 +150,61 @@ public class ImagemController {
         }
 
         return "redirect:/";
+    }
+
+    @Scheduled(fixedRate = 3600000)
+    public void limpezaAgendadaFotosTemporarias() {
+        limparImagensExpiradas();
+    }
+
+    private synchronized void limparImagensExpiradas() {
+        Path diretorio = Paths.get(CAMINHO_FOTOS);
+        if (!Files.exists(diretorio)) {
+            return;
+        }
+
+        Instant limite = Instant.now().minus(TEMPO_EXPIRACAO_FOTOS);
+        int removidas = 0;
+
+        try (Stream<Path> paths = Files.walk(diretorio)) {
+            List<Path> arquivosExpirados = paths
+                    .filter(Files::isRegularFile)
+                    .filter(this::ehImagemSuportada)
+                    .filter(path -> arquivoExpirado(path, limite))
+                    .collect(Collectors.toList());
+
+            for (Path arquivo : arquivosExpirados) {
+                try {
+                    Files.deleteIfExists(arquivo);
+                    removidas++;
+                } catch (IOException e) {
+                    logger.warn("Nao foi possivel excluir imagem temporaria expirada: {}", arquivo.getFileName(), e);
+                }
+            }
+        } catch (IOException e) {
+            logger.error("Erro ao limpar imagens expiradas do diretório {}: ", CAMINHO_FOTOS, e);
+            return;
+        }
+
+        if (removidas > 0) {
+            logger.info("Limpeza de fotos temporarias executada: {} imagem(ns) removida(s) com mais de 24h.", removidas);
+            this.cacheImagens = Collections.emptyList();
+            this.ultimaAtualizacaoCache = 0;
+        }
+    }
+
+    private boolean arquivoExpirado(Path path, Instant limite) {
+        try {
+            FileTime ultimaModificacao = Files.getLastModifiedTime(path);
+            return ultimaModificacao.toInstant().isBefore(limite);
+        } catch (IOException e) {
+            logger.warn("Nao foi possivel verificar data de expiracao da imagem: {}", path.getFileName(), e);
+            return false;
+        }
+    }
+
+    private boolean ehImagemSuportada(Path path) {
+        String nome = path.getFileName().toString().toLowerCase();
+        return nome.endsWith(".jpg") || nome.endsWith(".jpeg") || nome.endsWith(".png");
     }
 }

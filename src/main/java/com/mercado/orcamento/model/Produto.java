@@ -23,6 +23,7 @@ public class Produto {
     private String marca;
     private String peso;
     private String imagemUrl;
+    private Integer quantidadeDesejada;
     
     // Grupo de equivalência para produtos substitutos (Ex: "Arroz 5kg")
     private Long grupoEquivalenciaId; 

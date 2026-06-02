@@ -21,9 +21,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Stream;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -58,11 +60,14 @@ public class OrcamentoController {
             model.addAttribute("tiposPreco", TipoPreco.values());
             
             model.addAttribute("tabelaPrecos", service.listarPrecosPlanos());
+            model.addAttribute("gradeValores", service.listarGradeValores());
             model.addAttribute("fotos", imagemController.listarImagens());
             
             // Verifica se a lista de compras está vazia (para uso na View)
             boolean listaVazia = itens == null || itens.stream().noneMatch(Produto::isNaListaDeCompras);
             model.addAttribute("listaVazia", listaVazia);
+            long totalItensLista = itens == null ? 0 : itens.stream().filter(Produto::isNaListaDeCompras).count();
+            model.addAttribute("totalItensLista", totalItensLista);
             
             // Serializa os itens para JSON para uso no JavaScript (Lógica de Melhor Preço)
             String itensJson = "[]";
@@ -99,13 +104,31 @@ public class OrcamentoController {
     public String adicionar(@RequestParam String nome, 
                             @RequestParam(required = false) String codigoBarras,
                             @RequestParam(required = false) String marca,
-                            @RequestParam(required = false) String peso) {
-        boolean jaExiste = service.produtoJaExiste(nome);
-        service.adicionarItem(nome, codigoBarras, marca, peso);
+                            @RequestParam(required = false) String peso,
+                            @RequestParam(required = false) Mercado mercado,
+                            @RequestParam(required = false) BigDecimal precoVarejo,
+                            @RequestParam(required = false) BigDecimal precoAtacado,
+                            @RequestParam(required = false) BigDecimal precoCartao,
+                            RedirectAttributes redirectAttributes) {
+        boolean jaExiste = service.produtoJaExiste(nome, marca, peso, mercado);
+        boolean temPrecoInformado = Stream.of(precoVarejo, precoAtacado, precoCartao).anyMatch(valor -> valor != null);
+
+        if (temPrecoInformado && mercado == null) {
+            redirectAttributes.addFlashAttribute("erroCadastro", "Selecione o mercado para salvar os precos informados.");
+            return "redirect:/?tab=home";
+        }
+
+        service.cadastrarProdutoComPrecos(nome, codigoBarras, marca, peso, mercado, precoVarejo, precoAtacado, precoCartao);
+        if (temPrecoInformado) {
+            redirectAttributes.addFlashAttribute("mensagemCadastro", "Produto e precos salvos com sucesso.");
+            return "redirect:/?tab=valores";
+        }
         
         if (jaExiste) {
+            redirectAttributes.addFlashAttribute("mensagemCadastro", "Produto ja existente. Os dados foram atualizados.");
             return "redirect:/?tab=home&status=existente";
         }
+        redirectAttributes.addFlashAttribute("mensagemCadastro", "Produto salvo com sucesso.");
         return "redirect:/?tab=home&status=sucesso";
     }
     
@@ -120,6 +143,34 @@ public class OrcamentoController {
     public String importarLista(@RequestParam String listaRapida) {
         service.importarListaRapida(listaRapida);
         return "redirect:/?tab=comprar"; // Mantém na aba de compras
+    }
+
+    @PostMapping("/minha-lista/adicionar")
+    public String adicionarItemNaLista(@RequestParam String nome,
+                                       @RequestParam(required = false) String peso,
+                                       @RequestParam(required = false) String marca,
+                                       @RequestParam(required = false) Integer quantidadeDesejada,
+                                       RedirectAttributes redirectAttributes) {
+        Produto produto = service.adicionarItemNaLista(nome, peso, marca, quantidadeDesejada);
+        if (produto != null) {
+            redirectAttributes.addFlashAttribute("mensagemLista",
+                    "Item adicionado a sua missao de compra: " + produto.getNome());
+        }
+        return "redirect:/?tab=comprar";
+    }
+
+    @PostMapping("/minha-lista/atualizar")
+    public String atualizarItemDaLista(@RequestParam Long idItem,
+                                       @RequestParam(required = false) String peso,
+                                       @RequestParam(required = false) String marca,
+                                       @RequestParam(required = false) Integer quantidadeDesejada,
+                                       RedirectAttributes redirectAttributes) {
+        Produto produto = service.atualizarPreferenciasItemDaLista(idItem, peso, marca, quantidadeDesejada);
+        if (produto != null) {
+            redirectAttributes.addFlashAttribute("mensagemLista",
+                    "Item atualizado na sua missao de compra: " + produto.getNome());
+        }
+        return "redirect:/?tab=comprar";
     }
 
     @PostMapping("/limparLista")
@@ -152,6 +203,25 @@ public class OrcamentoController {
         }
         
         return "redirect:/?tab=home";
+    }
+
+    @PostMapping("/valores/editar")
+    public String editarRegistroDaGrade(@RequestParam Long idProduto,
+                                        @RequestParam Mercado mercado,
+                                        @RequestParam String nome,
+                                        @RequestParam(required = false) String marca,
+                                        @RequestParam(required = false) String peso,
+                                        @RequestParam(required = false) BigDecimal precoVarejo,
+                                        @RequestParam(required = false) BigDecimal precoAtacado,
+                                        @RequestParam(required = false) BigDecimal precoCartao,
+                                        RedirectAttributes redirectAttributes) {
+        Produto produto = service.atualizarRegistroDaGrade(idProduto, mercado, nome, marca, peso, precoVarejo, precoAtacado, precoCartao);
+        if (produto != null) {
+            redirectAttributes.addFlashAttribute("mensagemValores", "Registro atualizado com sucesso.");
+        } else {
+            redirectAttributes.addFlashAttribute("erroCadastro", "Nao foi possivel localizar o registro para edicao.");
+        }
+        return "redirect:/?tab=valores";
     }
 
     @GetMapping("/acesso-negado")
