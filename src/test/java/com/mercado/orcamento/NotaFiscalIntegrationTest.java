@@ -128,8 +128,8 @@ class NotaFiscalIntegrationTest {
         assertEquals(1,precos.findByProduto(produtos.findById(resultado.primeiroProdutoId()).orElseThrow()).size());
         mvc.perform(get("/api/minhas-notas/99999999")).andExpect(status().isNotFound());
     }
-    @Test void paginaRenderizaMenuLateralELeitor() throws Exception {
-        mvc.perform(get("/")).andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Leitor QR")))
+    @Test void paginaRenderizaMenuLateralENotaFiscal() throws Exception {
+        mvc.perform(get("/")).andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Minhas notas")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("notaForm")));
     }
     @Test void importaPrecoUnitarioComDataOriginalSemDuplicarNota() throws Exception {
