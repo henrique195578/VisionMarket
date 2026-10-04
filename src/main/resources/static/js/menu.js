@@ -13,7 +13,9 @@ function mostrar(valor, salvar) {
     menu.hidden = !aberto;
     document.body.classList.toggle('menu-aberto', aberto);
     botao.setAttribute('aria-expanded', String(aberto));
-    botao.textContent = aberto ? 'Ocultar menu' : 'Mostrar menu';
+    botao.textContent = aberto ? '<<' : '>>';
+    botao.setAttribute('aria-label', aberto ? 'Ocultar menu' : 'Mostrar menu');
+    botao.title = aberto ? 'Ocultar menu' : 'Mostrar menu';
     if (salvar) { try { localStorage.setItem('vision.menuAberto', String(aberto)); } catch (_) {} }
 }
 botao.addEventListener('click', () => mostrar(!aberto, true));
