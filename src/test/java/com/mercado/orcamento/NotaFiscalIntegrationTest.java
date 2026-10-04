@@ -98,6 +98,16 @@ class NotaFiscalIntegrationTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("vision-build")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("atualizarAplicacao")));
     }
+    @Test void chaveManualRejeitaTamanhoEDigitoInvalidos() throws Exception {
+        mvc.perform(post("/api/notas/chave").contentType("application/json").content("{\"chave\":\"1234\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/notas/chave").contentType("application/json")
+                .content("{\"chave\":\"35261006057223030755650110000447971110028221\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/")).andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("notaChaveForm")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("notaDigitarManual")));
+    }
     @Test void paginaRenderizaMenuLateralELeitor() throws Exception {
         mvc.perform(get("/")).andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Leitor QR")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("notaForm")));

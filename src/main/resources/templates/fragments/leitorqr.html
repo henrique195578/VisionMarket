@@ -1,7 +1,26 @@
 <!DOCTYPE html>
 <html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"><body>
 <section th:fragment="leitor" id="leitorqr" class="section" hidden>
-<h1 class="h4">Leitor QR · Nota fiscal</h1>
+<div id="notaCapturaTopo" class="nota-captura-topo">
+<button id="notaVoltarLista" type="button" aria-label="Voltar à lista">←</button><span>Nota Fiscal</span>
+</div>
+<div id="notaManualArea" hidden>
+<button id="notaVoltarScanner" type="button" class="btn btn-link">← Voltar à câmera</button>
+<h1 class="h4">Digitar manualmente</h1>
+<form id="notaChaveForm">
+<label for="notaChave" class="form-label">Chave de acesso da nota fiscal</label>
+<input id="notaChave" type="text" inputmode="numeric" autocomplete="off" maxlength="54" class="form-control" placeholder="3526 1006 0572 …" aria-describedby="notaChaveAjuda">
+<p id="notaChaveAjuda" class="small muted mt-2">Digite os 44 dígitos da chave de acesso.</p>
+<button id="notaEnviarChave" class="btn btn-success w-100" disabled>Enviar nota fiscal</button>
+</form>
+</div>
+<div id="notaScannerAcoes" class="nota-scanner-acoes">
+<p>Aponte para o QR Code da nota fiscal</p>
+<button id="notaDigitarManual" type="button">Digitar manualmente</button>
+<button id="notaOutrasOpcoes" type="button">Escolher arquivo ou inserir link</button>
+<button id="notaTentarCamera" type="button">Abrir câmera</button>
+</div>
+<h1 class="h4 nota-titulo-antigo">Leitor QR · Nota fiscal</h1>
 <p class="muted">Use arquivo, link ou a câmera do celular: cadastre os produtos e os preços unitários que você pagou.</p>
 <div class="card mb-3"><div class="card-body">
 <h2 class="h5">Como deseja adicionar a nota?</h2>

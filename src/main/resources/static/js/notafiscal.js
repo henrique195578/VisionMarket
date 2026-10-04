@@ -74,6 +74,7 @@ async function respostaJson(response) {
     return dados;
 }
 function exibirLeitura(dados) {
+    document.dispatchEvent(new CustomEvent("vision:nota-lida", {detail: dados}));
     arquivo = dados.arquivo; codigoQr = dados.codigoQr || '';
     $('notaTexto').textContent = dados.texto || ''; $('notaQrTexto').textContent = codigoQr ? 'Link / QR: ' + codigoQr : 'Nenhum QR reconhecido.';
     $('notaTextoDetalhes').hidden = false; $('notaStatus').textContent = dados.aviso;
@@ -107,6 +108,15 @@ async function consultarLink(valor) {
     } catch (err) { $('notaStatus').textContent = err.message; }
     finally { terminarLeitura(); }
 }
+document.addEventListener('vision:nota-chave', async event => {
+    if (!iniciarLeitura('Consultando a chave no portal fiscal…')) return;
+    $('notaPreview').hidden = true;
+    try {
+        const response = await fetch('/api/notas/chave', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chave:event.detail})});
+        exibirLeitura(await respostaJson(response));
+    } catch (err) { $('notaStatus').textContent = err.message; }
+    finally { terminarLeitura(); }
+});
 $('notaConsultarLink').addEventListener('click', () => consultarLink($('notaLink').value));
 $('notaLink').addEventListener('input', () => atualizarLink($('notaLink').value));
 $('notaLink').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); consultarLink($('notaLink').value); } });

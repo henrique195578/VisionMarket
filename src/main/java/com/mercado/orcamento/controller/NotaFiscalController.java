@@ -33,6 +33,20 @@ public class NotaFiscalController {
         try { return ResponseEntity.ok(links.consultar(pedido.url())); }
         catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(Map.of("erro",e.getMessage())); }
     }
+    public record ChavePedido(String chave) {}
+    @PostMapping("/chave")
+    public ResponseEntity<?> chave(@RequestBody ChavePedido pedido) {
+        String chave = pedido.chave() == null ? "" : pedido.chave().replaceAll("\\s", "");
+        if (!chave.matches("[0-9]{44}")) return ResponseEntity.badRequest().body(Map.of("erro","Informe os 44 dígitos da chave."));
+        int soma=0, peso=2;
+        for (int i=42;i>=0;i--) { soma+=(chave.charAt(i)-'0')*peso; peso=peso==9?2:peso+1; }
+        int resto=soma%11, digito=resto<2?0:11-resto;
+        if (digito!=chave.charAt(43)-'0') return ResponseEntity.badRequest().body(Map.of("erro","Chave inválida. Confira os números."));
+        if (!chave.startsWith("35") || !chave.substring(20,22).equals("65"))
+            return ResponseEntity.badRequest().body(Map.of("erro","A consulta por chave aceita NFC-e de São Paulo. Para outras notas, importe o arquivo ou o link compatível."));
+        try { return ResponseEntity.ok(links.consultar("https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx?chNFe="+chave)); }
+        catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(Map.of("erro",e.getMessage())); }
+    }
     @PostMapping("/qr")
     public ResponseEntity<?> qr(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty() || file.getSize()>3*1024*1024)
