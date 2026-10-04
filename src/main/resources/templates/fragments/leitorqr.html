@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org"><body>
+<section th:fragment="leitor" id="leitorqr" class="section" hidden>
+<h1 class="h4">Leitor QR · Nota fiscal</h1>
+<p class="muted">Use arquivo, link ou a câmera do celular: cadastre os produtos e os preços unitários que você pagou.</p>
+<div class="card mb-3"><div class="card-body">
+<h2 class="h5">Como deseja adicionar a nota?</h2>
+<div class="row g-3">
+<div class="col-12 col-md-6"><label for="notaFoto" class="form-label">1 · Escolher arquivo</label>
+<input id="notaFoto" type="file" accept="image/*,.xml,application/xml,text/xml" class="form-control nota-fonte">
+<p class="small muted mt-2">Foto da nota ou XML original, até 15 MB. Escolha um arquivo do celular ou computador.</p></div>
+<div class="col-12 col-md-6"><label class="form-label">2 · Câmera para QR Code</label>
+<button id="notaAbrirCamera" type="button" class="btn btn-outline-success w-100 nota-fonte">Abrir câmera e apontar para o QR</button>
+<label for="notaQrFoto" class="btn btn-outline-secondary w-100 mt-2">Fotografar QR Code</label>
+<input id="notaQrFoto" type="file" accept="image/*" capture="environment" class="form-control nota-fonte" hidden>
+<p class="small muted mt-2">Aponte a câmera para o QR da nota. A consulta dos itens começa ao reconhecer o link.</p></div>
+<div class="col-12"><label for="notaLink" class="form-label">3 · Link da nota fiscal paulista</label>
+<div class="input-group"><input id="notaLink" type="url" class="form-control nota-fonte" placeholder="https://www.nfce.fazenda.sp.gov.br/..." maxlength="4096"><button id="notaConsultarLink" type="button" class="btn btn-success nota-fonte">Consultar nota</button></div>
+<a id="notaAbrirConsulta" class="small d-inline-block mt-2" target="_blank" rel="noopener noreferrer" hidden>Abrir consulta oficial</a></div>
+</div>
+<div id="notaCameraArea" class="mt-3" hidden><video id="notaVideo" autoplay playsinline muted style="width:100%;max-height:360px;background:#172b3a;border-radius:12px"></video>
+<p class="small muted mt-2">Mantenha o QR inteiro e nítido dentro da imagem.</p><button id="notaPararCamera" type="button" class="btn btn-outline-danger">Fechar câmera</button></div>
+<p id="notaStatus" class="small muted" role="status" aria-live="polite"></p>
+<img id="notaPreview" alt="Nota fiscal para conferir os itens e preços pagos" hidden style="max-height:420px;width:100%;object-fit:contain;background:#f3f6fa;border-radius:12px">
+<details id="notaTextoDetalhes" class="mt-3" hidden><summary>Texto reconhecido / QR encontrado</summary>
+<pre id="notaTexto" class="small text-wrap mt-2"></pre><p id="notaQrTexto" class="small text-break"></p></details>
+</div></div>
+<p id="notaOrigem" class="small muted" hidden></p>
+<form id="notaForm">
+<div class="card mb-3"><div class="card-body row g-3">
+<div class="col-sm-5"><label for="notaMercado" class="form-label">Mercado onde comprou</label><select id="notaMercado" class="form-select" required><option value="">Selecione</option><option th:each="m : ${mercados}" th:value="${m}" th:text="${m.nomeExibicao}"></option></select></div>
+<div class="col-sm-7"><label for="notaUnidade" class="form-label">Filial / endereço</label><input id="notaUnidade" class="form-control" maxlength="150" required placeholder="Ex.: Centro · Rua São João, 100"></div>
+<div class="col-12"><label for="notaData" class="form-label">Data e hora da compra na nota</label><input id="notaData" type="datetime-local" class="form-control" required><small class="muted">Confirme a data do comprovante. Esse preço será registrado naquela data.</small></div>
+</div></div>
+<div class="card mb-3"><div class="card-body">
+<div class="d-flex justify-content-between gap-2 align-items-center mb-2"><h2 class="h5 mb-0">Conferir itens da nota</h2><button id="notaAdicionar" type="button" class="btn btn-outline-success">Adicionar item</button></div>
+<p class="small muted">Edite nomes abreviados e os números que o leitor não reconheceu corretamente. Marca e embalagem ajudam a reunir o mesmo produto em notas e mercados diferentes.</p>
+<p class="small muted">Para produtos vendidos por peso, informe a quantidade em kg e o preço por kg. Se houver desconto, confira o valor efetivamente pago por unidade.</p>
+<div id="notaItens"></div>
+<p id="notaResumo" class="fw-bold mt-3"></p>
+<label class="d-flex gap-2 small mb-3"><input id="notaNaLista" type="checkbox">Adicionar estes produtos também à minha lista de compras.</label>
+<label class="d-flex gap-2 small mb-3"><input id="notaConferida" type="checkbox" required>Conferi os produtos, quantidades, preços e a data com a nota fiscal.</label>
+<button id="notaImportar" class="btn btn-success w-100 py-3" disabled>Salvar produtos e preços pagos</button>
+<small class="muted d-block mt-2">A importação preserva os preços anteriores e vincula os novos registros ao arquivo ou à consulta da nota.</small>
+</div></div>
+</form>
+<div id="notaSucesso" class="alert alert-success" hidden role="status"></div>
+<a id="notaComparar" class="btn btn-outline-success w-100 mb-3" href="/?etapa=comparar" hidden>Comparar os preços importados</a>
+</section>
+</body></html>

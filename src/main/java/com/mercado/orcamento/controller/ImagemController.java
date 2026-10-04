@@ -1,210 +1,64 @@
 package com.mercado.orcamento.controller;
 
 import com.mercado.orcamento.dto.DadosExtraidos;
-import com.mercado.orcamento.service.OcrService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
-import org.springframework.http.CacheControl;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Scheduled;
+import com.mercado.orcamento.service.*;
+import org.springframework.core.io.*;
+import org.springframework.http.*;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-
-import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.FileTime;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.*;
 
 @Controller
 public class ImagemController {
+    private final FotoService fotos;
+    private final OcrService ocr;
+    public ImagemController(FotoService fotos, OcrService ocr) { this.fotos = fotos; this.ocr = ocr; }
+    public List<String> listarImagens() { return fotos.listar(); }
 
-    private static final Logger logger = LoggerFactory.getLogger(ImagemController.class);
-    private static final Duration TEMPO_EXPIRACAO_FOTOS = Duration.ofHours(24);
-    private static final long CACHE_IMAGENS_MS = 300000;
-
-    private final String CAMINHO_FOTOS = "C:\\Users\\Borges\\Downloads\\MERCADO_FOTOS";
-    private final OcrService ocrService;
-    
-    // Cache simples para evitar ler o disco toda hora
-    private List<String> cacheImagens = Collections.emptyList();
-    private long ultimaAtualizacaoCache = 0;
-
-    public ImagemController(OcrService ocrService) {
-        this.ocrService = ocrService;
-    }
-
-    // Retorna a lista de nomes de arquivos de imagem
-    public List<String> listarImagens() {
-        limparImagensExpiradas();
-        long agora = System.currentTimeMillis();
-        
-        // Atualiza o cache apenas se passou 5 minutos (300.000 ms)
-        if (agora - ultimaAtualizacaoCache < CACHE_IMAGENS_MS && !cacheImagens.isEmpty()) {
-            return cacheImagens;
-        }
-        
-        try (Stream<Path> paths = Files.walk(Paths.get(CAMINHO_FOTOS))) {
-            cacheImagens = paths
-                    .filter(Files::isRegularFile)
-                    .map(Path::getFileName)
-                    .map(Path::toString)
-                    .filter(nome -> nome.toLowerCase().endsWith(".jpg") || nome.toLowerCase().endsWith(".jpeg") || nome.toLowerCase().endsWith(".png"))
-                    .collect(Collectors.toList());
-            ultimaAtualizacaoCache = agora;
-            return cacheImagens;
-        } catch (IOException e) {
-            logger.error("Erro ao listar imagens do diretório {}: ", CAMINHO_FOTOS, e);
-            return Collections.emptyList();
-        }
-    }
-
-    // Serve a imagem para o navegador conseguir mostrar
-    @GetMapping("/imagens/{nomeArquivo:.+}")
+    @GetMapping("/imagens/{nome:.+}")
     @ResponseBody
-    public ResponseEntity<Resource> servirImagem(@PathVariable String nomeArquivo) {
+    public ResponseEntity<Resource> servirImagem(@PathVariable String nome) throws IOException {
         try {
-            Path arquivoPath = Paths.get(CAMINHO_FOTOS).resolve(nomeArquivo);
-            Resource resource = new UrlResource(arquivoPath.toUri());
+            if (!fotos.existe(nome)) return ResponseEntity.notFound().build();
+            MediaType tipo = nome.endsWith(".xml") ? MediaType.APPLICATION_XML
+                    : nome.endsWith(".txt") ? new MediaType("text","plain",java.nio.charset.StandardCharsets.UTF_8)
+                    : nome.endsWith(".png") ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG;
+            return ResponseEntity.ok().contentType(tipo).header("X-Content-Type-Options","nosniff")
+                    .body(new UrlResource(fotos.resolver(nome).toUri()));
+        } catch (IllegalArgumentException e) { return ResponseEntity.badRequest().build(); }
+    }
 
-            if (resource.exists() || resource.isReadable()) {
-                return ResponseEntity.ok()
-                        .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS)) // Cache de 30 dias
-                        .contentType(MediaType.IMAGE_JPEG) // Assumindo JPEG, o navegador se vira com outros
-                        .body(resource);
-            } else {
-                return ResponseEntity.notFound().build();
-            }
-        } catch (MalformedURLException e) {
-            return ResponseEntity.badRequest().build();
+    @GetMapping("/ocr/{nome:.+}")
+    @ResponseBody
+    public ResponseEntity<DadosExtraidos> extrairDados(@PathVariable String nome) {
+        try {
+            if (!fotos.existe(nome)) return ResponseEntity.notFound().build();
+            return ResponseEntity.ok(ocr.extrairDadosDaImagem(nome));
+        } catch (IllegalArgumentException e) { return ResponseEntity.badRequest().build(); }
+    }
+
+    @PostMapping("/api/fotos")
+    @ResponseBody
+    public ResponseEntity<?> fotografar(@RequestParam("file") MultipartFile file) {
+        try {
+            String nome = fotos.salvar(file);
+            return ResponseEntity.ok(ocr.extrairDadosDaImagem(nome));
+        } catch (IOException | IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("erro", e.getMessage()));
         }
     }
 
-    // NOVO: Endpoint para extrair dados da imagem via OCR
-    @GetMapping("/ocr/{nomeArquivo:.+}")
-    @ResponseBody
-    public ResponseEntity<DadosExtraidos> extrairDados(@PathVariable String nomeArquivo) {
-        DadosExtraidos dados = ocrService.extrairDadosDaImagem(nomeArquivo);
-        return ResponseEntity.ok(dados);
-    }
-
-    // NOVO: Endpoint para Upload de Imagens
     @PostMapping("/upload")
-    public String uploadImagem(@RequestParam("file") MultipartFile file, RedirectAttributes redirectAttributes) {
-        if (file.isEmpty()) {
-            redirectAttributes.addFlashAttribute("mensagem", "Por favor, selecione uma imagem.");
-            return "redirect:/";
-        }
-
+    public String uploadImagem(@RequestParam("file") MultipartFile file, RedirectAttributes redirect) {
         try {
-            // Garante que o diretório existe
-            Path diretorio = Paths.get(CAMINHO_FOTOS);
-            if (!Files.exists(diretorio)) {
-                Files.createDirectories(diretorio);
-            }
-
-            // Normaliza o nome para evitar caminhos vindos do navegador e
-            // caracteres invalidos em Windows durante o upload.
-            String nomeOriginal = file.getOriginalFilename();
-            String nomeSeguro = (nomeOriginal == null || nomeOriginal.isBlank())
-                    ? "imagem-upload.jpg"
-                    : Paths.get(nomeOriginal).getFileName().toString().replaceAll("[\\\\/:*?\"<>|]", "_");
-
-            Path path = diretorio.resolve(nomeSeguro);
-            if (Files.exists(path)) {
-                logger.info("Arquivo ja existente na galeria. Reutilizando imagem: {}", nomeSeguro);
-            } else {
-                Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
-            }
-
-            // Invalida o cache para mostrar a nova imagem imediatamente
-            this.cacheImagens = Collections.emptyList();
-            this.ultimaAtualizacaoCache = 0;
-
-            redirectAttributes.addFlashAttribute("mensagem", "Imagem pronta para leitura: " + nomeSeguro);
-            // Passa o nome do arquivo para que a tela já possa sugerir o scan
-            redirectAttributes.addFlashAttribute("arquivoRecemCarregado", nomeSeguro);
-
-        } catch (IOException e) {
-            logger.error("Erro ao fazer upload da imagem: {}", file.getOriginalFilename(), e);
-            redirectAttributes.addFlashAttribute("erro", "Erro ao fazer upload: " + e.getMessage());
+            String nome = fotos.salvar(file);
+            redirect.addFlashAttribute("arquivoRecemCarregado", nome);
+        } catch (IOException | IllegalArgumentException e) {
+            redirect.addFlashAttribute("erro", e.getMessage());
         }
-
-        return "redirect:/";
-    }
-
-    @Scheduled(fixedRate = 3600000)
-    public void limpezaAgendadaFotosTemporarias() {
-        limparImagensExpiradas();
-    }
-
-    private synchronized void limparImagensExpiradas() {
-        Path diretorio = Paths.get(CAMINHO_FOTOS);
-        if (!Files.exists(diretorio)) {
-            return;
-        }
-
-        Instant limite = Instant.now().minus(TEMPO_EXPIRACAO_FOTOS);
-        int removidas = 0;
-
-        try (Stream<Path> paths = Files.walk(diretorio)) {
-            List<Path> arquivosExpirados = paths
-                    .filter(Files::isRegularFile)
-                    .filter(this::ehImagemSuportada)
-                    .filter(path -> arquivoExpirado(path, limite))
-                    .collect(Collectors.toList());
-
-            for (Path arquivo : arquivosExpirados) {
-                try {
-                    Files.deleteIfExists(arquivo);
-                    removidas++;
-                } catch (IOException e) {
-                    logger.warn("Nao foi possivel excluir imagem temporaria expirada: {}", arquivo.getFileName(), e);
-                }
-            }
-        } catch (IOException e) {
-            logger.error("Erro ao limpar imagens expiradas do diretório {}: ", CAMINHO_FOTOS, e);
-            return;
-        }
-
-        if (removidas > 0) {
-            logger.info("Limpeza de fotos temporarias executada: {} imagem(ns) removida(s) com mais de 24h.", removidas);
-            this.cacheImagens = Collections.emptyList();
-            this.ultimaAtualizacaoCache = 0;
-        }
-    }
-
-    private boolean arquivoExpirado(Path path, Instant limite) {
-        try {
-            FileTime ultimaModificacao = Files.getLastModifiedTime(path);
-            return ultimaModificacao.toInstant().isBefore(limite);
-        } catch (IOException e) {
-            logger.warn("Nao foi possivel verificar data de expiracao da imagem: {}", path.getFileName(), e);
-            return false;
-        }
-    }
-
-    private boolean ehImagemSuportada(Path path) {
-        String nome = path.getFileName().toString().toLowerCase();
-        return nome.endsWith(".jpg") || nome.endsWith(".jpeg") || nome.endsWith(".png");
+        return "redirect:/?etapa=foto";
     }
 }

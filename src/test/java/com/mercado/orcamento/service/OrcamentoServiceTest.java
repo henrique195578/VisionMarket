@@ -153,7 +153,7 @@ class OrcamentoServiceTest {
     }
 
     @Test
-    void deveEditarDescricaoEManterRegistroMaisRecenteDoMercado() {
+    void deveRegistrarNovoPrecoSemApagarLeituraAnterior() {
         Produto produto = new Produto("AMACIANTE", null);
         produto.setId(30L);
         produto.setMarca("DOWNY");
@@ -162,20 +162,16 @@ class OrcamentoServiceTest {
         RegistroPreco precoVarejo = new RegistroPreco(produto, Mercado.PANTOJA, new java.math.BigDecimal("23.99"), TipoPreco.VAREJO);
 
         when(produtoRepository.findById(30L)).thenReturn(Optional.of(produto));
-        when(registroPrecoRepository.findTopByProdutoIdAndMercadoAndTipoPrecoOrderByDataRegistroDesc(30L, Mercado.PANTOJA, TipoPreco.VAREJO))
-                .thenReturn(Optional.of(precoVarejo));
-        when(registroPrecoRepository.findTopByProdutoIdAndMercadoAndTipoPrecoOrderByDataRegistroDesc(30L, Mercado.PANTOJA, TipoPreco.ATACADO))
-                .thenReturn(Optional.empty());
-        when(registroPrecoRepository.findTopByProdutoIdAndMercadoAndTipoPrecoOrderByDataRegistroDesc(30L, Mercado.PANTOJA, TipoPreco.CARTAO))
-                .thenReturn(Optional.empty());
-
         Produto produtoAtualizado = service.atualizarRegistroDaGrade(30L, Mercado.PANTOJA, "amaciante suavizante", "downy", "1l",
                 new java.math.BigDecimal("19.99"), null, null);
 
         assertEquals("AMACIANTE SUAVIZANTE", produtoAtualizado.getNome());
         assertEquals("DOWNY", produtoAtualizado.getMarca());
         assertEquals("1L", produtoAtualizado.getPeso());
-        assertEquals(new java.math.BigDecimal("19.99"), precoVarejo.getValor());
-        verify(registroPrecoRepository).save(precoVarejo);
+        assertEquals(new java.math.BigDecimal("23.99"), precoVarejo.getValor());
+        var captor = org.mockito.ArgumentCaptor.forClass(RegistroPreco.class);
+        verify(registroPrecoRepository).save(captor.capture());
+        assertEquals(new java.math.BigDecimal("19.99"), captor.getValue().getValor());
+        org.junit.jupiter.api.Assertions.assertNotSame(precoVarejo, captor.getValue());
     }
 }

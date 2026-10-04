@@ -92,7 +92,7 @@ public class OrcamentoController {
     
     @PostMapping("/api/logout")
     @ResponseBody
-    public ResponseEntity<Void> logout(@CookieValue(value = "auth_token", required = false) String token) {
+    public ResponseEntity<Void> logout(@CookieValue(value = "APP_SESSION_TOKEN", required = false) String token) {
         if (token != null) {
             logger.info("Logout solicitado para token: {}", token);
             sessaoService.encerrarSessao(token);
@@ -142,7 +142,7 @@ public class OrcamentoController {
     @PostMapping("/importarLista")
     public String importarLista(@RequestParam String listaRapida) {
         service.importarListaRapida(listaRapida);
-        return "redirect:/?tab=comprar"; // Mantém na aba de compras
+        return "redirect:/?etapa=lista"; // Mantém na aba de compras
     }
 
     @PostMapping("/minha-lista/adicionar")
@@ -156,7 +156,7 @@ public class OrcamentoController {
             redirectAttributes.addFlashAttribute("mensagemLista",
                     "Item adicionado a sua missao de compra: " + produto.getNome());
         }
-        return "redirect:/?tab=comprar";
+        return "redirect:/?etapa=lista";
     }
 
     @PostMapping("/minha-lista/atualizar")
@@ -170,19 +170,19 @@ public class OrcamentoController {
             redirectAttributes.addFlashAttribute("mensagemLista",
                     "Item atualizado na sua missao de compra: " + produto.getNome());
         }
-        return "redirect:/?tab=comprar";
+        return "redirect:/?etapa=lista";
     }
 
     @PostMapping("/limparLista")
     public String limparLista() {
         service.limparListaDeCompras();
-        return "redirect:/?tab=comprar";
+        return "redirect:/?etapa=lista";
     }
 
     @PostMapping("/excluirItem")
     public String excluirItem(@RequestParam Long idItem) {
         service.excluirItem(idItem);
-        return "redirect:/?tab=comprar"; // Mantém na aba de compras
+        return "redirect:/?etapa=lista"; // Mantém na aba de compras
     }
 
     @PostMapping("/preco")

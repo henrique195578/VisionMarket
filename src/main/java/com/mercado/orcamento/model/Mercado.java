@@ -5,7 +5,8 @@ public enum Mercado {
     ATACADAO("Mercado Atacadão"),
     PANTOJA("Mercado Pantoja"),
     EXAMINE("Mercado Examine"),
-    BANANAS("Mercado Bananas");
+    BANANAS("Mercado Bananas"),
+    ASSAI("Assaí Atacadista");
 
     private final String nomeExibicao;
 

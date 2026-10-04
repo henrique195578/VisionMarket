@@ -19,6 +19,7 @@ public class RegistroPreco {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "produto_id")
     @lombok.ToString.Exclude
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Produto produto;
 
     @Enumerated(EnumType.STRING)
@@ -26,12 +27,21 @@ public class RegistroPreco {
 
     private String regiao; // Ex: "Centro", "Zona Norte" (Pode ser inferido do Mercado futuramente)
 
+    @Column(precision = 19, scale = 4)
     private BigDecimal valor;
 
     @Enumerated(EnumType.STRING)
     private TipoPreco tipoPreco;
 
     private LocalDateTime dataRegistro;
+    private String nomeArquivoImagem;
+    private String unidade;
+    private Integer quantidadeMinima;
+    private String condicoes;
+    private Long notaFiscalId;
+    @Column(precision = 19, scale = 4)
+    private java.math.BigDecimal quantidadeCompra;
+    private String unidadeMedida;
 
     public RegistroPreco(Produto produto, Mercado mercado, BigDecimal valor, TipoPreco tipoPreco) {
         this.produto = produto;

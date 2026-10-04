@@ -259,9 +259,7 @@ public class OrcamentoService {
         Optional<Produto> existenteNome = buscarProdutoExato(nomeUpper, marcaNormalizada, pesoNormalizado);
         if (existenteNome.isPresent()) {
             Produto produtoExistente = existenteNome.get();
-            if (mercado == null || possuiPrecoNoMercado(produtoExistente, mercado)) {
-                return produtoExistente;
-            }
+            return produtoExistente;
         }
         
         Produto novo = new Produto(nomeUpper, codigoBarrasNormalizado);
@@ -408,20 +406,9 @@ public class OrcamentoService {
             return;
         }
 
-        Optional<RegistroPreco> registroExistente = registroPrecoRepository
-                .findTopByProdutoIdAndMercadoAndTipoPrecoOrderByDataRegistroDesc(produto.getId(), mercado, tipoPreco);
-
-        if (novoValor == null) {
-            return;
-        }
-
-        RegistroPreco registro = registroExistente.orElseGet(() -> new RegistroPreco(produto, mercado, novoValor, tipoPreco));
-        registro.setProduto(produto);
-        registro.setMercado(mercado);
-        registro.setTipoPreco(tipoPreco);
-        registro.setValor(novoValor);
-        registro.setDataRegistro(LocalDateTime.now());
-        registroPrecoRepository.save(registro);
+        if (novoValor == null) return;
+        if (novoValor.signum() <= 0) throw new IllegalArgumentException("Preço deve ser positivo.");
+        registroPrecoRepository.save(new RegistroPreco(produto, mercado, novoValor, tipoPreco));
     }
 
     private BigDecimal obterPrecoMaisRecente(List<RegistroPreco> registros, TipoPreco tipoPreco) {

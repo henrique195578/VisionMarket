@@ -45,7 +45,9 @@ public class Produto {
     public java.util.Map<Mercado, java.util.Map<TipoPreco, java.math.BigDecimal>> getPrecos() {
         java.util.Map<Mercado, java.util.Map<TipoPreco, java.math.BigDecimal>> mapa = new java.util.HashMap<>();
         
-        for (RegistroPreco rp : historicoPrecos) {
+        for (RegistroPreco rp : historicoPrecos.stream().sorted(java.util.Comparator
+                .comparing(RegistroPreco::getDataRegistro, java.util.Comparator.nullsFirst(java.time.LocalDateTime::compareTo))
+                .thenComparing(RegistroPreco::getId, java.util.Comparator.nullsFirst(Long::compareTo))).toList()) {
             if (rp.getMercado() == null || rp.getTipoPreco() == null || rp.getValor() == null) continue;
             
             // Se tiver múltiplos preços pro mesmo mercado/tipo, pega o mais recente (assumindo que a lista pode ter histórico antigo)

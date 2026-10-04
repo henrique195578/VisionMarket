@@ -39,3 +39,7 @@ data/*.trace.db
 .classpath
 .project
 .settings/
+
+data/fotos/
+
+data/tessdata/

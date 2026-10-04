@@ -5,6 +5,10 @@ import lombok.Data;
 @Data
 public class DadosExtraidos {
     private String textoBruto;
+    private String precoVarejo;
+    private String precoAtacado;
+    private String precoCartao;
+    private Integer quantidadeMinima;
     private String nomeArquivoImagem;
     private String descricaoProduto;
     private String precoEncontrado;

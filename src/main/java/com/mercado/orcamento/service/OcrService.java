@@ -27,7 +27,7 @@ public class OcrService {
 
     private static final Logger logger = LoggerFactory.getLogger(OcrService.class);
 
-    private final String CAMINHO_FOTOS = "C:\\Users\\Borges\\Downloads\\MERCADO_FOTOS";
+    private final FotoService fotos;
     private final String tessdataPathConfigurado;
     private final String idiomaOcr;
     
@@ -41,13 +41,14 @@ public class OcrService {
     );
 
     public OcrService(@Value("${visionmarket.ocr.tessdata-path:}") String tessdataPathConfigurado,
-                      @Value("${visionmarket.ocr.language:eng}") String idiomaOcr) {
+                      @Value("${visionmarket.ocr.language:eng}") String idiomaOcr, FotoService fotos) {
+        this.fotos = fotos;
         this.tessdataPathConfigurado = tessdataPathConfigurado;
         this.idiomaOcr = idiomaOcr;
     }
 
     public DadosExtraidos extrairDadosDaImagem(String nomeArquivo) {
-        File imagem = new File(CAMINHO_FOTOS, nomeArquivo);
+        File imagem = fotos.resolver(nomeArquivo).toFile();
         DadosExtraidos dados = new DadosExtraidos();
         dados.setNomeArquivoImagem(nomeArquivo);
 
@@ -87,6 +88,7 @@ public class OcrService {
 
             // 3. Processa o texto com "Inteligência" (Heurística + Fuzzy)
             processarTexto(resultado, dados);
+            extrairModalidades(resultado, dados);
 
         } catch (TesseractException | IOException e) {
             dados.setTextoBruto("Erro ao processar imagem: " + e.getMessage());
@@ -165,6 +167,58 @@ public class OcrService {
         String descricao = extrairDescricaoProduto(limpo);
         dados.setDescricaoProduto(descricao);
         dados.setNomePossivel(descricao);
+    }
+
+
+    public DadosExtraidos analisarTexto(String texto) {
+        DadosExtraidos dados = new DadosExtraidos();
+        processarTexto(texto, dados);
+        extrairModalidades(texto, dados);
+        return dados;
+    }
+
+    private void extrairModalidades(String texto, DadosExtraidos dados) {
+        String normalizado = java.text.Normalizer.normalize(texto.toUpperCase(Locale.ROOT),
+                java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        String[] linhas = normalizado.split("\\R");
+        Pattern valor = Pattern.compile("(?<![\\d.,])(\\d{1,6}[.,]\\d{2})(?!\\d)");
+        Pattern minimo = Pattern.compile("(?:A PARTIR DE|MINIMO|ACIMA DE)\\s*(\\d+)\\s*(?:UN|PEC|ITEN)");
+        Matcher qtd = minimo.matcher(normalizado);
+        if (qtd.find()) dados.setQuantidadeMinima(Integer.valueOf(qtd.group(1)));
+        String modalidade = null;
+        boolean rotulada = false;
+        for (String linha : linhas) {
+            int rotulos = (linha.contains("ATAC") ? 1 : 0)
+                    + (linha.contains("CART") || linha.contains("CLUBE") ? 1 : 0)
+                    + (linha.contains("VAREJO") || linha.contains("UNITARIO") ? 1 : 0);
+            if (rotulos > 1) { modalidade = null; rotulada = true; continue; }
+            if (rotulos == 1) {
+                rotulada = true;
+                modalidade = linha.contains("ATAC") ? "ATACADO"
+                        : (linha.contains("CART") || linha.contains("CLUBE")) ? "CARTAO" : "VAREJO";
+            }
+            Matcher matcher = valor.matcher(linha);
+            List<String> candidatos = new ArrayList<>();
+            while (matcher.find()) candidatos.add(matcher.group(1).replace(",", "."));
+            if (modalidade != null && candidatos.size() == 1) {
+                String preco = candidatos.get(0);
+                switch (modalidade) {
+                    case "ATACADO" -> dados.setPrecoAtacado(preco);
+                    case "CARTAO" -> dados.setPrecoCartao(preco);
+                    case "VAREJO" -> dados.setPrecoVarejo(preco);
+                }
+                modalidade = null;
+            } else if (!candidatos.isEmpty()) {
+                modalidade = null;
+            }
+        }
+        // Um único preço sem rótulo pode ser sugerido como varejo; vários exigem conferência.
+        if (!rotulada) {
+            Matcher matcher = valor.matcher(normalizado);
+            Set<String> candidatos = new HashSet<>();
+            while (matcher.find()) candidatos.add(matcher.group(1).replace(",", "."));
+            if (candidatos.size() == 1) dados.setPrecoVarejo(candidatos.iterator().next());
+        }
     }
 
     private String extrairMelhorPreco(String textoOriginal, String textoLinear) {
