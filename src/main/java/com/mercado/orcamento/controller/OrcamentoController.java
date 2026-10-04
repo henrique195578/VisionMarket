@@ -224,7 +224,7 @@ public class OrcamentoController {
         return "redirect:/?tab=valores";
     }
 
-    @GetMapping("/acesso-negado")
+    @GetMapping(value = "/acesso-negado", produces = "text/html;charset=UTF-8")
     public String acessoNegado() {
         return "acesso-negado";
     }

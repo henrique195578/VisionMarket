@@ -89,6 +89,15 @@ class NotaFiscalIntegrationTest {
                 .andExpect(cookie().exists("APP_SESSION_TOKEN"));
         assertTrue(produtos.findAll().stream().noneMatch(p -> "NAO DEVE SALVAR".equals(p.getNome())));
     }
+    @Test void versaoPublicaSemCacheETelaComAtualizacaoManual() throws Exception {
+        mvc.perform(get("/api/versao").cookie(new jakarta.servlet.http.Cookie("APP_SESSION_TOKEN", "invalido")))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.build").isNotEmpty());
+        mvc.perform(get("/")).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("vision-build")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("atualizarAplicacao")));
+    }
     @Test void paginaRenderizaMenuLateralELeitor() throws Exception {
         mvc.perform(get("/")).andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Leitor QR")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("notaForm")));

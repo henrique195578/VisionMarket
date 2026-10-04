@@ -24,10 +24,11 @@ public class AuthInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String path = request.getRequestURI();
+        if (path.equals("/") || path.equals("/acesso-negado")) response.setHeader("Cache-Control", "no-store");
         
         // Ignorar recursos estáticos e página de erro
         if (path.startsWith("/css") || path.startsWith("/js") || path.startsWith("/images") || 
-            path.startsWith("/error") || path.equals("/acesso-negado")) {
+            path.startsWith("/error") || path.equals("/acesso-negado") || path.equals("/api/versao")) {
             return true;
         }
 
