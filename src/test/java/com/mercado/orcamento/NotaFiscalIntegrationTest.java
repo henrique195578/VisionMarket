@@ -70,7 +70,7 @@ class NotaFiscalIntegrationTest {
                 .flashAttrs(resultado.getFlashMap()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         var documento = org.jsoup.Jsoup.parse(html);
-        assertEquals("FEIJAO REGRESSAO LISTA", documento.selectFirst("#lista strong").text());
+        assertEquals("FEIJAO REGRESSAO LISTA", documento.selectFirst("#lista .painel-lista strong").text());
         assertEquals("1", documento.selectFirst("#lista input[name=quantidadeDesejada][aria-label]").val());
         assertEquals(1, documento.select("#produtoFoto option").stream()
                 .filter(o -> o.text().contains("FEIJAO REGRESSAO LISTA")).count());

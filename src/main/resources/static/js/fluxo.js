@@ -9,6 +9,7 @@ function guardar(chave, valor) { try { localStorage.setItem(chave, valor); } cat
 function ler(chave) { try { return localStorage.getItem(chave); } catch (_) { return null; } }
 function etapa(nome) {
     if (!['lista', 'foto', 'comparar', 'leitorqr'].includes(nome)) nome = 'lista';
+    document.body.dataset.etapa = nome;
     document.querySelectorAll('.section').forEach(el => { el.hidden = el.id !== nome; });
     document.querySelectorAll('[data-step]').forEach(el => el.classList.toggle('active', el.dataset.step === nome));
     const url = new URL(location.href); url.searchParams.set('etapa', nome); history.replaceState(null, '', url);
