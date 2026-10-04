@@ -6,6 +6,7 @@ function tela(modo){
     if(modo) leitor.dataset.captura=modo; else delete leitor.dataset.captura;
     document.body.classList.toggle('nota-capturando',!!modo);
     $('notaManualArea').hidden=modo!=='manual';
+    if(modo==='manual') $('notaStatus').textContent='';
 }
 function camera(){tela('camera');$('notaAbrirCamera').click();}
 document.querySelectorAll('[data-nota-camera]').forEach(el=>el.addEventListener('click',camera));
@@ -28,11 +29,34 @@ $('notaChave').addEventListener('input',()=>{
  $('notaEnviarChave').disabled=!chaveValida(digits);
  $('notaChaveAjuda').textContent=digits.length===44&&!chaveValida(digits)?'Chave inválida. Confira os números e o dígito final.':digits.length+' de 44 dígitos';
 });
-$('notaChaveForm').addEventListener('submit',e=>{
+let enviando = false;
+function feedback(titulo,mensagem,processando,url) {
+    $('notaFeedbackTitulo').textContent=titulo;
+    $('notaFeedbackMensagem').textContent=mensagem;
+    $('notaFeedbackFechar').hidden=processando;
+    $('notaFeedbackPortal').hidden=true;
+    if(url) {
+        try { const u=new URL(url); if(u.protocol==='https:' && u.hostname==='www.nfce.fazenda.sp.gov.br'){
+            $('notaFeedbackPortal').href=u.href;$('notaFeedbackPortal').hidden=false;
+        }} catch(_) {}
+    }
+    if(!$('notaFeedbackDialog').open) $('notaFeedbackDialog').showModal();
+}
+$('notaFeedbackFechar').addEventListener('click',()=>$('notaFeedbackDialog').close());
+$('notaChaveForm').addEventListener('submit',async e=>{
  e.preventDefault();const digits=$('notaChave').value.replace(/\D/g,'');
- if(!chaveValida(digits))return;
- document.dispatchEvent(new CustomEvent('vision:nota-chave',{detail:digits}));
+ if(!chaveValida(digits)||enviando)return;
+ enviando=true;$('notaEnviarChave').disabled=true;$('notaEnviarChave').textContent='Consultando…';
+ feedback('Consultando nota fiscal','Estamos buscando os dados no portal fiscal. Aguarde…',true);
+ try {
+    if(!window.VisionNotas?.consultarChave) throw new Error('O leitor não carregou corretamente. Atualize a página e tente novamente.');
+    const dados=await window.VisionNotas.consultarChave(digits);
+    if(dados.itens?.length) feedback('Nota localizada',dados.itens.length+' itens encontrados. Confira mercado, filial, data e valores e clique em “Salvar produtos e preços pagos”. Só após essa confirmação ela aparecerá em Minhas notas.',false);
+    else feedback('Consulta precisa de atenção',dados.aviso || 'Não foi possível obter os itens automaticamente. O portal pode exigir CAPTCHA. Abra a consulta oficial ou importe a foto/XML. A nota ainda não foi salva.',false,dados.urlConsulta);
+ } catch(err) { feedback('Não foi possível consultar',err.message,false); }
+ finally { enviando=false;$('notaEnviarChave').disabled=!chaveValida($('notaChave').value.replace(/\D/g,''));$('notaEnviarChave').textContent='Enviar nota fiscal';}
 });
+document.addEventListener('vision:nota-salva',()=>feedback('Nota salva','A importação foi concluída. O cupom está disponível em Minhas notas.',false));
 document.addEventListener('vision:nota-lida',()=>tela(null));
 document.addEventListener('vision:etapa',e=>{if(e.detail!=='leitorqr')tela(null);});
 })();

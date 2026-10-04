@@ -110,15 +110,23 @@ async function consultarLink(valor) {
     } catch (err) { $('notaStatus').textContent = err.message; }
     finally { terminarLeitura(); }
 }
-document.addEventListener('vision:nota-chave', async event => {
-    if (!iniciarLeitura('Consultando a chave no portal fiscal…')) return;
+async function consultarChave(chave) {
+    if (!iniciarLeitura('Consultando a nota fiscal. Aguarde…')) throw new Error('Há uma leitura em andamento. Aguarde a conclusão.');
     $('notaPreview').hidden = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
     try {
-        const response = await fetch('/api/notas/chave', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chave:event.detail})});
-        exibirLeitura(await respostaJson(response));
-    } catch (err) { $('notaStatus').textContent = err.message; }
-    finally { terminarLeitura(); }
-});
+        const response = await fetch('/api/notas/chave', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chave}),signal:controller.signal});
+        const dados = await respostaJson(response);
+        exibirLeitura(dados);
+        return dados;
+    } catch (err) {
+        const mensagem = err.name === 'AbortError' ? 'A consulta demorou para responder. Tente novamente ou importe a foto/XML da nota.' : err.message;
+        $('notaStatus').textContent = mensagem;
+        throw new Error(mensagem);
+    } finally { clearTimeout(timeout); terminarLeitura(); }
+}
+window.VisionNotas = { consultarChave };
 $('notaConsultarLink').addEventListener('click', () => consultarLink($('notaLink').value));
 $('notaLink').addEventListener('input', () => atualizarLink($('notaLink').value));
 $('notaLink').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); consultarLink($('notaLink').value); } });
@@ -233,6 +241,7 @@ $('notaForm').addEventListener('submit', async event => {
         importada = true; $('notaSucesso').textContent = dados.itensSalvos + ' itens salvos, com o preço unitário pago e a data da compra.';
         $('notaSucesso').hidden = false; $('notaComparar').href = '/?etapa=comparar&produto=' + dados.primeiroProdutoId;
         $('notaComparar').hidden = false; $('notaStatus').textContent = 'Nota importada com sucesso.';
+        document.dispatchEvent(new CustomEvent('vision:nota-salva'));
     } catch (err) {
         $('notaStatus').textContent = err.message; $('notaForm').querySelectorAll('input,select,button').forEach(el => { el.disabled = false; });
     } finally {

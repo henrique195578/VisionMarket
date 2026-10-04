@@ -10,6 +10,7 @@
 <form id="notaChaveForm">
 <label for="notaChave" class="form-label">Chave de acesso da nota fiscal</label>
 <input id="notaChave" type="text" inputmode="numeric" autocomplete="off" maxlength="54" class="form-control" placeholder="3526 1006 0572 …" aria-describedby="notaChaveAjuda">
+<p class="small muted">Após a consulta, confira os itens e confirme a importação para salvar em Minhas notas.</p>
 <p id="notaChaveAjuda" class="small muted mt-2">Digite os 44 dígitos da chave de acesso.</p>
 <button id="notaEnviarChave" class="btn btn-success w-100" disabled>Enviar nota fiscal</button>
 </form>
@@ -65,5 +66,11 @@
 </form>
 <div id="notaSucesso" class="alert alert-success" hidden role="status"></div>
 <a id="notaComparar" class="btn btn-outline-success w-100 mb-3" href="/?etapa=comparar" hidden>Comparar os preços importados</a>
+<dialog id="notaFeedbackDialog" style="border:0;border-radius:18px;padding:24px;width:min(480px,calc(100vw - 32px));z-index:4000" aria-labelledby="notaFeedbackTitulo">
+<h2 id="notaFeedbackTitulo" class="h4"></h2>
+<p id="notaFeedbackMensagem" role="status" aria-live="polite"></p>
+<a id="notaFeedbackPortal" class="btn btn-outline-success mb-2" target="_blank" rel="noopener noreferrer" hidden>Abrir consulta oficial</a>
+<button id="notaFeedbackFechar" type="button" class="btn btn-success w-100">Entendi</button>
+</dialog>
 </section>
 </body></html>
