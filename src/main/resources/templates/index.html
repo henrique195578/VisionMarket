@@ -45,7 +45,7 @@ label{font-weight:600}.table{font-size:.92rem}small{line-height:1.5}.status{min-
 <p th:if="${listaVazia}" class="muted mb-0">Sua lista está vazia. Adicione o primeiro produto acima.</p>
 <div th:each="item : ${itens}" th:if="${item.naListaDeCompras}" class="border-bottom py-3">
 <div class="d-flex justify-content-between gap-2 align-items-center">
-<div><strong th:text="${item.nome}"></strong><div class="muted small"><span th:text="${item.marca}"></span> · <span th:text="${item.peso}"></span> · Qtd.: <span th:text="${item.quantidadeDesejada ?: 1}"></span></div></div>
+<div><strong th:text="${item.nome}"></strong><div class="muted small"><span th:if="${!#strings.isEmpty(item.marca)}"><span th:text="${item.marca}"></span> · </span><span th:if="${!#strings.isEmpty(item.peso)}"><span th:text="${item.peso}"></span> · </span>Qtd.: <span th:text="${item.quantidadeDesejada ?: 1}"></span></div></div>
 <button type="button" class="btn btn-outline-success" th:attr="data-capturar=${item.id}">Fotografar</button>
 </div>
 <details class="mt-2"><summary class="small muted">Editar quantidade / retirar da lista</summary>
