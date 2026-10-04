@@ -36,6 +36,12 @@ public class NotaFiscalService {
         nota.setMercado(pedido.mercado()); nota.setUnidade(normalizar(pedido.unidade()));
         nota.setDataCompra(pedido.dataCompra()); nota.setDataImportacao(LocalDateTime.now());
         nota.setQuantidadeItens(pedido.itens().size());
+        String emitente = pedido.emitente() == null ? "" : pedido.emitente().trim();
+        if (emitente.length()>150) throw new IllegalArgumentException("O nome do emitente deve ter até 150 caracteres.");
+        nota.setEmitenteOriginal(emitente.isBlank()?null:emitente);
+        nota.setNomeEstabelecimento(emitente.isBlank()?pedido.mercado().getNomeExibicao():emitente);
+        nota.setEstabelecimentoConfirmado(false);
+        nota.setTotalItens(pedido.itens().stream().map(Item::total).reduce(BigDecimal.ZERO,BigDecimal::add));
         notas.saveAndFlush(nota);
         Long primeiro = null;
         for (Item item : pedido.itens()) {
@@ -55,6 +61,7 @@ public class NotaFiscalService {
             preco.setUnidade(nota.getUnidade()); preco.setNotaFiscalId(nota.getId());
             preco.setQuantidadeCompra(item.quantidade()); preco.setUnidadeMedida(normalizar(item.unidadeMedida()));
             preco.setCondicoes("Preço pago na nota fiscal; modalidade e condições não identificadas.");
+            preco.setNomeItemNota(item.nome().trim()); preco.setTotalItemNota(item.total());
             precos.save(preco);
         }
         return new Resultado(pedido.itens().size(), primeiro);

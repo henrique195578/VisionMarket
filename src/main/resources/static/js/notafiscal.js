@@ -2,6 +2,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const moeda = n => Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+let emitenteNota = '';
 let arquivo = '', codigoQr = '', preview = null, lendo = false, salvando = false, importada = false;
 let cameraStream = null, cameraTimer = null, cameraGeracao = 0;
 function numero(value) {
@@ -59,7 +60,7 @@ function fontesDisabled(valor) {
 }
 function iniciarLeitura(mensagem) {
     if (lendo || salvando) return false;
-    pararCamera(); arquivo = ''; codigoQr = ''; importada = false; lendo = true;
+    pararCamera(); arquivo = ''; codigoQr = ''; emitenteNota = ''; importada = false; lendo = true;
     $('notaForm').querySelectorAll('input,select,button').forEach(el => { el.disabled = false; });
     $('notaItens').replaceChildren(); $('notaConferida').checked = false; $('notaTextoDetalhes').hidden = true;
     $('notaSucesso').hidden = true; $('notaComparar').hidden = true; $('notaOrigem').hidden = true;
@@ -75,6 +76,7 @@ async function respostaJson(response) {
 }
 function exibirLeitura(dados) {
     document.dispatchEvent(new CustomEvent("vision:nota-lida", {detail: dados}));
+    emitenteNota = dados.emitente || '';
     arquivo = dados.arquivo; codigoQr = dados.codigoQr || '';
     $('notaTexto').textContent = dados.texto || ''; $('notaQrTexto').textContent = codigoQr ? 'Link / QR: ' + codigoQr : 'Nenhum QR reconhecido.';
     $('notaTextoDetalhes').hidden = false; $('notaStatus').textContent = dados.aviso;
@@ -224,7 +226,7 @@ $('notaForm').addEventListener('submit', async event => {
     }
     pararCamera(); salvando = true; fontesDisabled(true); resumo(); $('notaImportar').textContent = 'Salvando itens…';
     const pedido = { arquivo, codigoQr, mercado: $('notaMercado').value, unidade: $('notaUnidade').value,
-        dataCompra: $('notaData').value.slice(0,16) + ':00', adicionarNaLista: $('notaNaLista').checked, itens };
+        emitente: emitenteNota, dataCompra: $('notaData').value.slice(0,16) + ':00', adicionarNaLista: $('notaNaLista').checked, itens };
     $('notaForm').querySelectorAll('input,select,button').forEach(el => { el.disabled = true; });
     try {
         const dados = await respostaJson(await fetch('/api/notas/importar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pedido) }));

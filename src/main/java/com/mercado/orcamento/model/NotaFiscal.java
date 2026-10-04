@@ -20,4 +20,11 @@ public class NotaFiscal {
     private LocalDateTime dataCompra;
     private LocalDateTime dataImportacao;
     private Integer quantidadeItens;
+    @Column(length = 150)
+    private String nomeEstabelecimento;
+    @Column(length = 150)
+    private String emitenteOriginal;
+    private Boolean estabelecimentoConfirmado;
+    @Column(precision = 19, scale = 2)
+    private java.math.BigDecimal totalItens;
 }

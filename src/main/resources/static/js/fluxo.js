@@ -8,7 +8,7 @@ let registros = [], busca = 0, upload = 0, fotoUrl = null;
 function guardar(chave, valor) { try { localStorage.setItem(chave, valor); } catch (_) {} }
 function ler(chave) { try { return localStorage.getItem(chave); } catch (_) { return null; } }
 function etapa(nome) {
-    if (!['lista', 'foto', 'comparar', 'leitorqr'].includes(nome)) nome = 'lista';
+    if (!['lista', 'foto', 'comparar', 'leitorqr', 'minhasnotas'].includes(nome)) nome = 'lista';
     document.body.dataset.etapa = nome;
     document.querySelectorAll('.section').forEach(el => { el.hidden = el.id !== nome; });
     document.querySelectorAll('[data-step]').forEach(el => el.classList.toggle('active', el.dataset.step === nome));

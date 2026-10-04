@@ -16,6 +16,8 @@ import com.mercado.orcamento.model.TipoPreco;
 public interface RegistroPrecoRepository extends JpaRepository<RegistroPreco, Long> {
     
     List<RegistroPreco> findByProduto(Produto produto);
+    @Query("SELECT r FROM RegistroPreco r JOIN FETCH r.produto WHERE r.notaFiscalId IN :ids ORDER BY r.id")
+    List<RegistroPreco> findPorNotas(@Param("ids") List<Long> ids);
 
     @Query("SELECT MIN(r.valor) FROM RegistroPreco r WHERE r.produto = :produto")
     BigDecimal findMenorPrecoByProduto(@Param("produto") Produto produto);

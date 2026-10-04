@@ -16,6 +16,11 @@ public class NotaFiscalDTO {
         }
     }
     public record Importacao(String arquivo, String codigoQr, Mercado mercado, String unidade,
-                             LocalDateTime dataCompra, boolean adicionarNaLista, List<Item> itens) {}
+                             LocalDateTime dataCompra, boolean adicionarNaLista, List<Item> itens, String emitente) {
+        public Importacao(String arquivo, String codigoQr, Mercado mercado, String unidade,
+                          LocalDateTime dataCompra, boolean adicionarNaLista, List<Item> itens) {
+            this(arquivo,codigoQr,mercado,unidade,dataCompra,adicionarNaLista,itens,null);
+        }
+    }
     public record Resultado(int itensSalvos, Long primeiroProdutoId) {}
 }

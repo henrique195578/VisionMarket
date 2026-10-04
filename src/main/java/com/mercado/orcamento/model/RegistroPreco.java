@@ -39,6 +39,11 @@ public class RegistroPreco {
     private Integer quantidadeMinima;
     private String condicoes;
     private Long notaFiscalId;
+    @Column(length = 150)
+    private String nomeItemNota;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal totalItemNota;
+
     @Column(precision = 19, scale = 4)
     private java.math.BigDecimal quantidadeCompra;
     private String unidadeMedida;

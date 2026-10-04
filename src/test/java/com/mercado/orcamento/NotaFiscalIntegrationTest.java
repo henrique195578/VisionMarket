@@ -108,6 +108,26 @@ class NotaFiscalIntegrationTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("notaChaveForm")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("notaDigitarManual")));
     }
+    @Test void minhasNotasPreservamItensECorrigemSomenteCupomSelecionado() throws Exception {
+        String arquivo=fotos.salvar(foto());
+        var resultado=notas.importar(pedido(arquivo,new BigDecimal("8.49"),new BigDecimal("16.98")));
+        Long notaId=precos.findByProduto(produtos.findById(resultado.primeiroProdutoId()).orElseThrow()).get(0).getNotaFiscalId();
+        mvc.perform(get("/api/minhas-notas")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].total").value(16.98));
+        mvc.perform(get("/api/minhas-notas/"+notaId)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[0].nome").value("FEIJAO"))
+                .andExpect(jsonPath("$.itens[0].total").value(16.98));
+        mvc.perform(patch("/api/minhas-notas/"+notaId+"/estabelecimento").contentType("application/json")
+                .content("{\"nome\":\"Mercado do bairro\",\"mercado\":\"ASSAI\",\"unidade\":\"CENTRO NOVO\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.nome").value("Mercado do bairro"))
+                .andExpect(jsonPath("$.estabelecimentoConfirmado").value(true));
+        var registro=precos.findByProduto(produtos.findById(resultado.primeiroProdutoId()).orElseThrow()).get(0);
+        assertEquals(Mercado.ASSAI,registro.getMercado());
+        assertEquals("CENTRO NOVO",registro.getUnidade());
+        assertEquals(new BigDecimal("8.49"),registro.getValor());
+        assertEquals(1,precos.findByProduto(produtos.findById(resultado.primeiroProdutoId()).orElseThrow()).size());
+        mvc.perform(get("/api/minhas-notas/99999999")).andExpect(status().isNotFound());
+    }
     @Test void paginaRenderizaMenuLateralELeitor() throws Exception {
         mvc.perform(get("/")).andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("Leitor QR")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("notaForm")));
