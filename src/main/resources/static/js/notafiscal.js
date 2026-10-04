@@ -3,6 +3,7 @@
 const $ = id => document.getElementById(id);
 const moeda = n => Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 let emitenteNota = '';
+let itensOficiais = null;
 let arquivo = '', codigoQr = '', preview = null, lendo = false, salvando = false, importada = false;
 let cameraStream = null, cameraTimer = null, cameraGeracao = 0;
 function numero(value) {
@@ -20,7 +21,7 @@ function campo(rotulo, nome, valor, tipo, step) {
     div.append(label, input); return div;
 }
 function adicionar(item) {
-    if (importada || salvando) return;
+    if (importada || salvando || itensOficiais) return;
     item = item || { nome: '', quantidade: 1, unidadeMedida: 'UN', precoUnitario: '', total: '' };
     const card = document.createElement('div'); card.className = 'border rounded-3 p-3 mb-3 nota-item';
     const row = document.createElement('div'); row.className = 'row g-2';
@@ -36,6 +37,7 @@ function adicionar(item) {
     card.addEventListener('input', () => { $('notaConferida').checked = false; resumo(); }); resumo();
 }
 function coletar() {
+    if (itensOficiais) return itensOficiais.map(item => ({...item}));
     return [...document.querySelectorAll('.nota-item')].map(card => {
         const item = {};
         card.querySelectorAll('[data-campo]').forEach(el => {
@@ -45,7 +47,7 @@ function coletar() {
     });
 }
 function resumo() {
-    const itens = coletar(); let soma = 0;
+    const itens = coletar(); let soma = itensOficiais ? itens.reduce((total,item) => total + Number(item.total || 0),0) : 0;
     document.querySelectorAll('.nota-item').forEach((card, i) => {
         const item = itens[i]; soma += item.total || 0;
         card.querySelector('.nota-aviso').textContent = Math.abs(item.quantidade * item.precoUnitario - item.total) > .03
@@ -56,11 +58,14 @@ function resumo() {
 }
 function fontesDisabled(valor) {
     document.querySelectorAll('.nota-fonte').forEach(el => { el.disabled = valor; });
-    $('notaAdicionar').disabled = valor || importada;
+    $('notaAdicionar').disabled = valor || importada || !!itensOficiais;
 }
 function iniciarLeitura(mensagem) {
     if (lendo || salvando) return false;
-    pararCamera(); arquivo = ''; codigoQr = ''; emitenteNota = ''; importada = false; lendo = true;
+    pararCamera(); arquivo = ''; codigoQr = ''; emitenteNota = ''; itensOficiais = null;
+    delete $('leitorqr').dataset.grade;
+    $('notaAdicionar').hidden = false;
+    document.querySelectorAll('.nota-ajuda-edicao').forEach(el => { el.hidden=false; }); importada = false; lendo = true;
     $('notaForm').querySelectorAll('input,select,button').forEach(el => { el.disabled = false; });
     $('notaItens').replaceChildren(); $('notaConferida').checked = false; $('notaTextoDetalhes').hidden = true;
     $('notaSucesso').hidden = true; $('notaComparar').hidden = true; $('notaOrigem').hidden = true;
@@ -83,8 +88,33 @@ function exibirLeitura(dados) {
     if (dados.dataCompra) $('notaData').value = dados.dataCompra.slice(0,16);
     if (dados.emitente && /SENDAS|ASSA[IÍ]/i.test(dados.emitente)) $('notaMercado').value = 'ASSAI';
     if (dados.emitente) { $('notaOrigem').textContent = 'Emitente da nota: ' + dados.emitente + '. Confira o mercado e a filial abaixo.'; $('notaOrigem').hidden = false; }
-    (dados.itens || []).forEach(adicionar); if (!dados.itens || !dados.itens.length) adicionar();
+    if (dados.urlConsulta && dados.itens && dados.itens.length) {
+        itensOficiais = dados.itens.map(item => Object.freeze({...item}));
+        $('leitorqr').dataset.grade = 'true'; $('notaAdicionar').hidden = true;
+        document.querySelectorAll('.nota-ajuda-edicao').forEach(el => { el.hidden=true; });
+        gradeOficial();
+    } else {
+        (dados.itens || []).forEach(adicionar);
+        if (!dados.itens || !dados.itens.length) adicionar();
+    }
     if (dados.urlConsulta) atualizarLink(dados.urlConsulta);
+}
+function gradeOficial() {
+    const container=document.createElement('div'); container.className='table-responsive nota-grade';
+    const tabela=document.createElement('table'); tabela.className='table table-bordered table-striped align-middle mb-0';
+    const caption=document.createElement('caption');caption.textContent='Itens da nota fiscal · somente leitura';caption.className='caption-top';
+    const head=document.createElement('thead'), linha=document.createElement('tr');
+    ['Produto','Quantidade','Unidade','Preço unitário','Total'].forEach(nome=>{const th=document.createElement('th');th.scope='col';th.textContent=nome;linha.append(th);});
+    head.append(linha);const body=document.createElement('tbody');
+    itensOficiais.forEach(item=>{
+        const tr=document.createElement('tr');
+        const valores=[item.nome,Number(item.quantidade).toLocaleString('pt-BR',{maximumFractionDigits:4}),item.unidadeMedida,
+            Number(item.precoUnitario).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:4}),moeda(item.total)];
+        valores.forEach((valor,index)=>{const td=document.createElement('td');td.textContent=valor;if(index>0)td.className='text-end text-nowrap';tr.append(td);});
+        body.append(tr);
+    });
+    tabela.append(caption,head,body);container.append(tabela);$('notaItens').replaceChildren(container);
+    resumo();
 }
 function linkOficial(valor) {
     try {
